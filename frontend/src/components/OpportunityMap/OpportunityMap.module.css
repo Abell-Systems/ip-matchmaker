@@ -1,0 +1,6 @@
+.placeholder {
+  border: 1px dashed currentColor;
+  border-radius: 8px;
+  padding: 2rem;
+  opacity: 0.7;
+}
