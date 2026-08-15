@@ -25,6 +25,7 @@ def test_research_agent_has_patent_tools():
     assert "search_patents_tool" in tool_names
     assert "get_similar_patents_tool" in tool_names
     assert "get_citations_tool" in tool_names
+    assert "cluster_patents_tool" in tool_names
 
 
 def test_adversarial_agent_has_exit_loop_tool():

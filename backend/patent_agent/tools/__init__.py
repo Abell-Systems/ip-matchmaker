@@ -4,13 +4,10 @@ ADK derives each tool's schema from the function signature and docstring, so the
 stay thin: validate nothing beyond what the type hints already express, delegate to
 get_patents_datasource(), and return plain dicts (LlmAgent tools should not return
 Pydantic model instances directly).
-
-The Day 4-6 landscape-clustering FunctionTool (embeddings + clustering over
-search_patents_tool results) is not implemented yet — it lands with the Days 4-6
-work per docs/roadmap.md, as a sibling function in this package.
 """
 
 from .bigquery_patents import get_patents_datasource
+from .clustering import cluster_patents_tool
 from .loop_control import exit_loop
 
 __all__ = [
@@ -18,6 +15,7 @@ __all__ = [
     "get_patent_by_number_tool",
     "get_citations_tool",
     "get_similar_patents_tool",
+    "cluster_patents_tool",
     "exit_loop",
 ]
 
