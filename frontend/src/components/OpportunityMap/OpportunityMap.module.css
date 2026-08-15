@@ -4,3 +4,72 @@
   padding: 2rem;
   opacity: 0.7;
 }
+
+.subtitle {
+  opacity: 0.75;
+  margin-bottom: 1rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.cardHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+}
+
+.cardHeader h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.badge {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0.15rem 0.5rem;
+  white-space: nowrap;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.25rem 0.75rem;
+  margin: 0.75rem 0;
+  font-size: 0.9rem;
+}
+
+.stats dt {
+  opacity: 0.7;
+}
+
+.stats dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.representative {
+  font-size: 0.8rem;
+  opacity: 0.75;
+  word-break: break-all;
+}
+
+.footnote {
+  margin-top: 1.5rem;
+  font-size: 0.85rem;
+  opacity: 0.6;
+}

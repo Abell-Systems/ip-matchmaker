@@ -4,7 +4,7 @@ _Finds patentable white-space opportunities by mining patent landscapes, proposi
 
 Built for the **Devpost "All Things Agentic Hackathon"** (Google Cloud / Gemini) — track: **The Taskmaster**.
 
-> Status: repo scaffolding in progress. See [`docs/roadmap.md`](docs/roadmap.md) for the day-by-day plan and [`docs/architecture.md`](docs/architecture.md) for the system design.
+> Status: Days 1-6 tooling done and demoable without external credentials (see below); Gemini-backed reasoning and Cloud Run deployment are blocked on `GEMINI_API_KEY` / GCP credentials. See [`docs/roadmap.md`](docs/roadmap.md) for the day-by-day plan and [`docs/architecture.md`](docs/architecture.md) for the system design.
 
 ## Architecture
 
@@ -12,7 +12,10 @@ See [`docs/architecture.md`](docs/architecture.md) for the full component breakd
 
 ## Features
 
-- _(updated as each day's work lands — see `docs/roadmap.md`)_
+- ✅ Patent landscape search + CPC-prefix clustering with a white-space score (density + recency + citation velocity), exposed at `GET /api/landscape` — works today with mock data, no credentials required.
+- ✅ Frontend `OpportunityMap` renders that landscape live (real data flow, not a placeholder).
+- ⏳ Inventor/Adversarial iteration loop and Governor scoring — built and unit-tested, but not yet exercised against real Gemini (needs `GEMINI_API_KEY`).
+- ⏳ Cloud Run deployment — Dockerfile builds locally; not yet deployed (needs a GCP project).
 
 ## Tech stack
 

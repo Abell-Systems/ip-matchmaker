@@ -13,15 +13,17 @@ This roadmap replaces the original 24-48h hackathon-sprint scope with a 15-day p
 
 Every submission to this hackathon must satisfy all of these — keep this list current through Day 15:
 
-- [ ] **Gemini 3.5+** used via Gemini API or Vertex AI (pinned in `backend/patent_agent/config.py`)
-- [ ] **Google Agent Framework**: Google ADK (Python) — all 4 agents + orchestration built on it
-- [ ] **Google Cloud infra service**: Cloud Run (deployed backend); BigQuery also counts as a second infra service once wired to real credentials
+- [ ] **Gemini 3.5+** used via Gemini API or Vertex AI (pinned in `backend/patent_agent/config.py`, model wired into all 4 `LlmAgent`s — **blocked: no `GEMINI_API_KEY` yet, so no real Gemini call has actually been made**)
+- [x] **Google Agent Framework**: Google ADK (Python) — all 4 agents + `LoopAgent`/`SequentialAgent` orchestration built, wired, and unit-tested (agent graph imports and composes correctly under `google-adk` 2.7.0)
+- [ ] **Google Cloud infra service**: Cloud Run (backend built and Docker-buildable, **not yet deployed** — blocked: no GCP project/credentials yet); BigQuery also counts as a second infra service once wired to real credentials
 - [ ] Hosted project URL (Cloud Run service URL, once deployed)
 - [ ] Text description (features, functionality, technologies used, other data sources, findings/learnings)
 - [ ] Public or private code repo (if private: share with `testing@devpost.com` and `cloudhackathons@google.com`)
 - [ ] `README.md` with reproducible spin-up instructions
 - [ ] Architecture diagram (see `docs/architecture.md`)
 - [ ] ~4 min demo video that **visibly shows the backend running on Google Cloud** (Cloud Run dashboard, Vertex AI logs, or the `.run.app` URL — not just localhost)
+
+**Blocked on credentials (need from the team, not more engineering time):** a real `GEMINI_API_KEY` (or Vertex AI access) and a GCP project to deploy Cloud Run against. Everything else buildable without them is done — see the Days 1-6 status below.
 
 Optional bonus points (not required, worth considering only if Days 14-15 have slack): public blog/video about the build process; social post with `#AllThingsAgenticHackathon`; integrating another Google AI model (Gemma/Veo/Lyria) — low priority, cut first if time is tight.
 
@@ -31,23 +33,29 @@ Optional bonus points (not required, worth considering only if Days 14-15 have s
 
 Everything downstream depends on picking **one concrete technology domain** for the demo (e.g. "solid-state battery electrolytes," "mRNA delivery lipids," a domain the team can sanity-check without being domain experts). This must be locked by end of Day 1 — do not let it drift past Day 3, since the clustering/white-space work in Days 4-6 is meaningless without a fixed corpus to mine.
 
-_Domain chosen: **(fill in Day 1)**_
+_Domain chosen: **solid-state electrolytes for EV batteries**._
+
+Rationale:
+- Active, high-volume research area with a real, well-known white-space narrative (dendrite suppression / ionic conductivity trade-offs) that's easy to explain to a non-specialist judge in the demo video.
+- No specialist domain knowledge required from the team to sanity-check candidate output, unlike e.g. mRNA delivery lipids.
+- Matches the domain already used in the mock fixtures/tests (`backend/tests/test_bigquery_mock.py` uses "battery electrolyte" / "energy storage" as example query/domain), so no rework needed there.
+- Narrow enough that a small mock/real patent sample is plausible; broad enough that a real BigQuery query (once credentials exist) will return a meaningful landscape rather than near-zero results.
 
 ---
 
 ## 3. Day-by-day plan
 
-### Days 1-3 — Data + Research Agent
-- Lock the demo domain (see §2).
-- Stand up `research_agent` (ADK `LlmAgent`) with BigQuery-backed tools (`search_patents`, `get_patent_by_number`, `get_citations`, `get_similar_patents`) against `patents-public-data.patents.publications` and `google_patents_research.publications`.
+### Days 1-3 — Data + Research Agent ✅ tools done, LLM invocation pending
+- Lock the demo domain (see §2) — **done**.
+- Stand up `research_agent` (ADK `LlmAgent`) with BigQuery-backed tools (`search_patents`, `get_patent_by_number`, `get_citations`, `get_similar_patents`) against `patents-public-data.patents.publications` and `google_patents_research.publications` — **done**, wired and unit-tested against the mock data source.
 - Ship against the **mock** `PatentsDataSource` first (`USE_MOCK_BIGQUERY=true`) — no GCP credentials needed to keep developing. Swap to real BigQuery the moment credentials exist, no code changes required elsewhere.
-- Decide the literature-search source (e.g. Semantic Scholar or arXiv API) — stub it the same way as BigQuery if credentials/rate limits are a blocker.
-- **Definition of done:** `research_agent` returns a structured `patent_landscape` (list of `PatentRecord`) for the locked domain, backed by mock or real data, callable end-to-end via `adk web`.
+- Decide the literature-search source (e.g. Semantic Scholar or arXiv API) — **not started**, stub it the same way as BigQuery if credentials/rate limits are a blocker.
+- **Definition of done:** `research_agent` returns a structured `patent_landscape` (list of `PatentRecord`) for the locked domain, backed by mock or real data, callable end-to-end via `adk web`. **Blocked on `GEMINI_API_KEY`** — the tools and agent wiring are done and tested, but no real Gemini call has been made yet. As an interim proof, `GET /api/landscape` exercises `search_patents_tool` + `cluster_patents_tool` directly (no LLM, no ADK Runner) and is verified working end-to-end, including from the frontend.
 
-### Days 4-6 — Landscape + Technology Graph
-- Add a clustering `FunctionTool` (embeddings + e.g. HDBSCAN/KMeans) that `research_agent` calls — **not a 5th LLM agent**, this is a deterministic step.
-- Define the saturated-area vs. white-space heuristic (e.g. cluster density + recency + citation velocity).
-- Freeze the output schema (cluster → representative patents → white-space score) by end of Day 6 so the frontend (Days 12-13) has a stable contract to build against.
+### Days 4-6 — Landscape + Technology Graph ✅ done (heuristic v0)
+- Add a clustering `FunctionTool` (embeddings + e.g. HDBSCAN/KMeans) that `research_agent` calls — **not a 5th LLM agent**, this is a deterministic step. **Done as a CPC-prefix heuristic** (`backend/patent_agent/tools/clustering.py`), deliberately credential-free; embedding-based clustering is the documented upgrade path once `GEMINI_API_KEY` exists (see §6 resolved decisions) — the `PatentCluster` contract doesn't need to change for that upgrade.
+- Define the saturated-area vs. white-space heuristic (e.g. cluster density + recency + citation velocity) — **done**: `white_space_score = 0.5·(1-density) + 0.3·recency + 0.2·citation_velocity`.
+- Freeze the output schema (cluster → representative patents → white-space score) by end of Day 6 so the frontend (Days 12-13) has a stable contract to build against — **done and already consumed**: the frontend's `OpportunityMap` renders real `PatentCluster` data from `GET /api/landscape` today, ahead of schedule (not the full Invention Opportunity Map, just proof the contract holds end to end).
 - **Definition of done:** given the locked domain, the pipeline outputs a ranked list of white-space clusters with supporting patent IDs — this is the visual/narrative backbone of the whole demo.
 
 ### Days 7-9 — Inventor Agent + Adversarial Agent
@@ -94,8 +102,15 @@ The Adversarial Agent's `AdversarialVerdict.cited_patents` and the Governor's `S
 
 | Decision | Options | Owner | Due |
 |---|---|---|---|
-| Demo domain | TBD | — | Day 1 |
 | Literature source (beyond patents) | Semantic Scholar API / arXiv API / skip | — | Day 3 |
 | Firestore for persisted scorecards | Add vs. skip (session state may be enough for a demo) | — | Day 10 |
 | Cloud Run deploy path | `adk deploy cloud_run` (fast) vs. manual Dockerfile + `gcloud run deploy` (more transparent, chosen for the initial scaffold) | — | Day 14 |
 | Domain-expert validation of chosen white space | Who / how | — | Before Day 7 |
+
+### Resolved decisions
+
+| Decision | Resolution | Date |
+|---|---|---|
+| Demo domain | Locked to **solid-state electrolytes for EV batteries** (see §2 for rationale) | Aug 15 |
+| `LoopAgent`/`SequentialAgent` deprecation warning | `google-adk` 2.7.0 emits `DeprecationWarning` for both in favor of a new `Workflow` API. Explicit decision: **stay on `LoopAgent`/`SequentialAgent` for now**, because `Workflow` cannot yet be used as an `LlmAgent` sub-agent (per the installed version's own warning text) — `invention_loop` is exactly that case, nested inside the root `SequentialAgent`. Migrating today would mean building on an API that doesn't yet support our topology. Re-evaluate once a `google-adk` release documents `Workflow` supporting nested `LlmAgent` sub-agents, or by Day 10 at the latest so it isn't a last-minute scramble if the classes are actually removed. Comment left in `backend/patent_agent/agent.py`. | Aug 15 |
+| Day 4-6 clustering approach | Implemented as a **CPC-prefix heuristic** (density + recency + citation velocity), not embeddings — deliberately credential-free so it works before `GEMINI_API_KEY` exists. Real embedding-based clustering (Gemini embeddings + HDBSCAN/KMeans) is the documented upgrade path once a key is available; the `PatentCluster` output contract doesn't need to change. See `backend/patent_agent/tools/clustering.py`. | Aug 15 |
