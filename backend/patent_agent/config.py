@@ -4,6 +4,7 @@ import os
 
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
 USE_MOCK_BIGQUERY = os.getenv("USE_MOCK_BIGQUERY", "true").lower() == "true"
+USE_MOCK_DEMAND = os.getenv("USE_MOCK_DEMAND", "true").lower() == "true"
 GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT")
 GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 

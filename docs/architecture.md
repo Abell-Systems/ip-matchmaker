@@ -13,6 +13,7 @@
   - `governor_agent` (Days 10-11)
   - composed by a root `SequentialAgent`
 - **BigQuery Patents Public Datasets** — `patents-public-data.patents.publications` / `google_patents_research.publications` (real), with the mock/real swap point (`USE_MOCK_BIGQUERY`) explicitly called out — this doubles as evidence for judges that the system was designed for real credentials, just not blocked by their absence during development
+- **Demand-signal sources** — SBIR.gov Topic API / CORDIS Data Extraction Tool API (open technology-need feeds), same mock/real swap pattern (`USE_MOCK_DEMAND`), feeding `white_space_score` as a market-pull term alongside patent supply-side signals
 - **Gemini API / Vertex AI** — the LLM backing every `LlmAgent`
 - **Session/state store** — ADK session state (in-memory/dev), noting whether Firestore gets added for persisted scorecards (open decision, see roadmap §6)
 
@@ -21,7 +22,7 @@
 ```
 User query (domain/prompt)
   → research_agent (BigQuery tool: search/get/cite/similar patents)
-  → clustering FunctionTool (embeddings + clustering → white-space clusters)
+  → clustering FunctionTool (CPC-prefix grouping + demand-signal lookup (SBIR/CORDIS) → white-space clusters)
   → invention_loop:
        inventor_agent (propose candidate) ⇄ adversarial_agent (attack w/ cited prior art)
        repeats until adversarial_agent calls exit_loop or max_iterations

@@ -4,7 +4,7 @@ os.environ.setdefault("USE_MOCK_BIGQUERY", "true")
 
 from patent_agent.tools.bigquery_patents import MockPatentsDataSource
 from patent_agent.tools.clustering import cluster_patents, cluster_patents_tool
-from patent_agent.tools.schemas import PatentCluster
+from patent_agent.tools.schemas import DemandSignal, PatentCluster
 
 
 def test_cluster_patents_groups_by_cpc_prefix():
@@ -32,6 +32,34 @@ def test_cluster_patents_sorted_by_white_space_score_desc():
     scores = [c.white_space_score for c in clusters]
 
     assert scores == sorted(scores, reverse=True)
+
+
+def test_cluster_patents_demand_signal_raises_matching_cluster_score():
+    source = MockPatentsDataSource()
+    records = source.search_patents("solid electrolyte", "solid-state battery electrolytes", max_results=30)
+
+    baseline = {c.cluster_id: c.white_space_score for c in cluster_patents(records, current_year=2026)}
+
+    target_prefix = next(c for c in baseline).removeprefix("cluster-")
+    demand = [
+        DemandSignal(
+            source="sbir",
+            id=f"sbir-{i}",
+            title="t",
+            description="d",
+            cpc_prefix=target_prefix,
+            posted_date="2025-01-01",
+            url="https://example.invalid/x",
+        )
+        for i in range(5)
+    ]
+
+    boosted = {
+        c.cluster_id: c.white_space_score
+        for c in cluster_patents(records, demand_signals=demand, current_year=2026)
+    }
+
+    assert boosted[f"cluster-{target_prefix}"] > baseline[f"cluster-{target_prefix}"]
 
 
 def test_cluster_patents_empty_input():

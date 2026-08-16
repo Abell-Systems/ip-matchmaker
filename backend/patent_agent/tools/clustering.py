@@ -15,7 +15,7 @@ clusters. The output contract (PatentCluster) does not need to change.
 from collections import defaultdict
 from datetime import date
 
-from .schemas import PatentCluster, PatentRecord
+from .schemas import DemandSignal, PatentCluster, PatentRecord
 
 _CPC_LABELS = {
     "H01M": "Batteries & fuel cells",
@@ -40,16 +40,19 @@ def _primary_prefix(record: PatentRecord) -> str:
 
 def cluster_patents(
     patents: list[PatentRecord],
+    demand_signals: list[DemandSignal] | None = None,
     current_year: int | None = None,
     white_space_threshold: float = 0.5,
 ) -> list[PatentCluster]:
     """Group patents by primary CPC prefix and score each group for white-space potential.
 
-    Score combines three signals, each normalized to [0, 1]:
+    Score combines four signals, each normalized to [0, 1]:
     - low density (few patents relative to the largest cluster) -> more white-space
     - recency (average filing year close to current_year) -> more white-space
     - citation velocity (citations per year since filing) -> active research interest,
       which keeps a low-density cluster from just being an abandoned dead end
+    - demand (open technology-need signals whose cpc_prefix matches the cluster) ->
+      market pull, which keeps a low-density cluster from being white-space nobody wants
     """
     if not patents:
         return []
@@ -61,6 +64,12 @@ def cluster_patents(
         groups[_primary_prefix(record)].append(record)
 
     max_count = max(len(records) for records in groups.values())
+
+    demand_counts: dict[str, int] = defaultdict(int)
+    for signal in demand_signals or []:
+        if signal.cpc_prefix:
+            demand_counts[signal.cpc_prefix] += 1
+    max_demand = max(demand_counts.values(), default=0)
 
     clusters: list[PatentCluster] = []
     for prefix, records in groups.items():
@@ -75,8 +84,14 @@ def cluster_patents(
         avg_velocity = sum(velocities) / len(velocities)
         velocity_norm = max(0.0, min(1.0, avg_velocity / 10))
 
+        demand_norm = (demand_counts[prefix] / max_demand) if max_demand else 0.0
+
         white_space_score = round(
-            0.5 * (1 - density_norm) + 0.3 * recency_norm + 0.2 * velocity_norm, 3
+            0.4 * (1 - density_norm)
+            + 0.2 * recency_norm
+            + 0.15 * velocity_norm
+            + 0.25 * demand_norm,
+            3,
         )
 
         representative = sorted(records, key=lambda r: r.citation_count, reverse=True)[:3]
@@ -109,7 +124,9 @@ def cluster_patents_tool(query: str, domain: str, max_results: int = 20) -> list
         is_white_space flag, and representative_patents (publication_numbers).
     """
     from .bigquery_patents import get_patents_datasource
+    from .demand_sources import get_demand_datasource
 
     records = get_patents_datasource().search_patents(query, domain, max_results)
-    clusters = cluster_patents(records)
+    demand_signals = get_demand_datasource().search_demand(query, domain)
+    clusters = cluster_patents(records, demand_signals)
     return [c.model_dump() for c in clusters]

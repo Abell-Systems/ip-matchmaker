@@ -21,6 +21,19 @@ class PatentRecord(BaseModel):
     similarity_score: float | None = None
 
 
+class DemandSignal(BaseModel):
+    """A market-pull signal: an open technology need/request from a demand-side source
+    (e.g. SBIR/STTR solicitations, CORDIS-funded research topics)."""
+
+    source: str  # "sbir" | "cordis"
+    id: str
+    title: str
+    description: str
+    cpc_prefix: str | None = None
+    posted_date: str
+    url: str
+
+
 class PatentCluster(BaseModel):
     """Output of the Day 4-6 clustering FunctionTool: one technology sub-area."""
 
