@@ -110,17 +110,22 @@ async def analyze(req: AnalyzeRequest) -> dict:
         f"'{req.cluster_id}'."
     )
     msg = types.Content(role="user", parts=[types.Part(text=prompt)])
-    for _ in _runner.run(user_id="web", session_id=session.id, new_message=msg):
-        pass
-    final = await _session_service.get_session(
-        app_name="ip_matchmaker", user_id="web", session_id=session.id
-    )
-    state = final.state or {}
-    return {
-        "candidates": _as_list(state.get(CANDIDATE_INVENTIONS)),
-        "verdicts": _as_list(state.get(ADVERSARIAL_VERDICTS)),
-        "scorecards": _as_list(state.get(SCORED_CANDIDATES)),
-    }
+    try:
+        async for _ in _runner.run_async(user_id="web", session_id=session.id, new_message=msg):
+            pass
+        final = await _session_service.get_session(
+            app_name="ip_matchmaker", user_id="web", session_id=session.id
+        )
+        state = final.state or {}
+        return {
+            "candidates": _as_list(state.get(CANDIDATE_INVENTIONS)),
+            "verdicts": _as_list(state.get(ADVERSARIAL_VERDICTS)),
+            "scorecards": _as_list(state.get(SCORED_CANDIDATES)),
+        }
+    finally:
+        await _session_service.delete_session(
+            app_name="ip_matchmaker", user_id="web", session_id=session.id
+        )
 
 
 if __name__ == "__main__":
