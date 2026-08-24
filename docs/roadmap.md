@@ -54,7 +54,7 @@ Rationale:
 
 ### Days 4-6 — Landscape + Technology Graph ✅ done (heuristic v0)
 - Add a clustering `FunctionTool` (embeddings + e.g. HDBSCAN/KMeans) that `research_agent` calls — **not a 5th LLM agent**, this is a deterministic step. **Done as a CPC-prefix heuristic** (`backend/patent_agent/tools/clustering.py`), deliberately credential-free; embedding-based clustering is the documented upgrade path once `GEMINI_API_KEY` exists (see §6 resolved decisions) — the `PatentCluster` contract doesn't need to change for that upgrade.
-- Define the saturated-area vs. white-space heuristic (e.g. cluster density + recency + citation velocity) — **done**: `white_space_score = 0.5·(1-density) + 0.3·recency + 0.2·citation_velocity`.
+- Define the saturated-area vs. white-space heuristic (e.g. cluster density + recency + citation velocity) — **done**: `white_space_score = 0.4·(1-density) + 0.2·recency + 0.15·citation_velocity + 0.25·demand` (demand term added Aug 24 via SBIR/CORDIS demand signals; see `docs/metodologia.md` for the full formal specification).
 - Freeze the output schema (cluster → representative patents → white-space score) by end of Day 6 so the frontend (Days 12-13) has a stable contract to build against — **done and already consumed**: the frontend's `OpportunityMap` renders real `PatentCluster` data from `GET /api/landscape` today, ahead of schedule (not the full Invention Opportunity Map, just proof the contract holds end to end).
 - **Definition of done:** given the locked domain, the pipeline outputs a ranked list of white-space clusters with supporting patent IDs — this is the visual/narrative backbone of the whole demo.
 
