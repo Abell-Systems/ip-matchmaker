@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { analyzeCluster, getLandscape } from "../../api/client";
-import type { AnalyzeResponse } from "../../api/client";
+import { getAnalyzeStatus, getLandscape, startAnalyze } from "../../api/client";
+import type { AnalyzeResult } from "../../api/client";
 import type { PatentCluster, PatentRecord } from "../../types/patent";
 import styles from "./OpportunityMap.module.css";
 
@@ -20,7 +20,7 @@ export function OpportunityMap() {
   const [patents, setPatents] = useState<PatentRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [expandedClusterId, setExpandedClusterId] = useState<string | null>(null);
-  const [analysis, setAnalysis] = useState<Record<string, AnalyzeResponse | "loading" | "error">>(
+  const [analysis, setAnalysis] = useState<Record<string, AnalyzeResult | "loading" | "error">>(
     {},
   );
 
@@ -51,12 +51,29 @@ export function OpportunityMap() {
     return patents.find((p) => p.publication_number === publicationNumber);
   }
 
-  function handleAnalyze(clusterId: string) {
+  const POLL_INTERVAL_MS = 3000;
+
+  async function handleAnalyze(clusterId: string) {
     if (analysis[clusterId] === "loading") return;
     setAnalysis((prev) => ({ ...prev, [clusterId]: "loading" }));
-    analyzeCluster(search.query, search.domain, clusterId)
-      .then((data) => setAnalysis((prev) => ({ ...prev, [clusterId]: data })))
-      .catch(() => setAnalysis((prev) => ({ ...prev, [clusterId]: "error" })));
+    try {
+      const { job_id: jobId } = await startAnalyze(search.query, search.domain, clusterId);
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const result = await getAnalyzeStatus(jobId);
+        if (result.status === "done") {
+          setAnalysis((prev) => ({ ...prev, [clusterId]: result }));
+          return;
+        }
+        if (result.status === "error") {
+          setAnalysis((prev) => ({ ...prev, [clusterId]: "error" }));
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+      }
+    } catch {
+      setAnalysis((prev) => ({ ...prev, [clusterId]: "error" }));
+    }
   }
 
   return (

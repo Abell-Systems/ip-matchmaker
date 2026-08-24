@@ -6,7 +6,10 @@ from fastapi.testclient import TestClient
 
 from main import app
 
-client = TestClient(app)
+# Entered (not just constructed) so the ASGI portal's event loop stays alive
+# across requests — needed because /api/analyze now spawns a background task
+# that must keep running after its own request handler returns.
+client = TestClient(app).__enter__()
 
 
 def test_analyze_rejects_empty_input_before_llm_call(monkeypatch):
@@ -88,3 +91,54 @@ def test_landscape_single_search_and_valid_clusters():
     assert len(calls) == 1  # patents searched once, not again for clustering
     assert body["clusters"]
     PatentCluster.model_validate(body["clusters"][0])
+
+
+def test_analyze_returns_202_with_job_id_and_completes(monkeypatch):
+    import asyncio
+
+    import main
+
+    async def fake_execute(req):
+        await asyncio.sleep(0)
+        return {"candidates": [], "verdicts": [], "scorecards": []}
+
+    monkeypatch.setattr(main, "_execute_analysis", fake_execute)
+    resp = client.post("/api/analyze", json={"query": "q", "domain": "d", "cluster_id": "c"})
+    assert resp.status_code == 202
+    job_id = resp.json()["job_id"]
+    import time
+
+    for _ in range(100):
+        body = client.get(f"/api/analyze/{job_id}").json()
+        if body["status"] != "running":
+            break
+        time.sleep(0.05)
+    assert body["status"] == "done"
+
+
+def test_analyze_status_unknown_job_is_404():
+    assert client.get("/api/analyze/nope").status_code == 404
+
+
+def test_analyze_rejects_concurrent_runs(monkeypatch):
+    import asyncio
+
+    import main
+
+    gate = asyncio.Event()
+
+    class FakeReq:
+        query = "q"
+        domain = "d"
+        cluster_id = "c"
+
+    async def slow_execute(req):
+        await gate.wait()
+        return {"candidates": [], "verdicts": [], "scorecards": []}
+
+    monkeypatch.setattr(main, "_execute_analysis", slow_execute)
+    first = client.post("/api/analyze", json={"query": "q", "domain": "d", "cluster_id": "c"})
+    assert first.status_code == 202
+    second = client.post("/api/analyze", json={"query": "q", "domain": "d", "cluster_id": "c2"})
+    assert second.status_code == 503
+    gate.set()

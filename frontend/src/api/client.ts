@@ -38,22 +38,33 @@ export async function getLandscape(
   return (await requestJson(`${API_BASE_URL}/api/landscape?${params}`, { signal })) as LandscapeResponse;
 }
 
-export interface AnalyzeResponse {
+export interface AnalyzeResult {
   candidates: InventionCandidate[];
   verdicts: AdversarialVerdict[];
   scorecards: ScoreCard[];
 }
 
-export async function analyzeCluster(
+export type AnalyzeStatus =
+  | { status: "running" }
+  | ({ status: "done" } & AnalyzeResult)
+  | { status: "error"; detail: string };
+
+// POST kicks off the agent graph in the background and returns a job id;
+// poll getAnalyzeStatus until status is "done" or "error".
+export async function startAnalyze(
   query: string,
   domain: string,
   clusterId: string,
   signal?: AbortSignal,
-): Promise<AnalyzeResponse> {
+): Promise<{ job_id: string }> {
   return (await requestJson(`${API_BASE_URL}/api/analyze`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ query, domain, cluster_id: clusterId }),
     signal,
-  })) as AnalyzeResponse;
+  })) as { job_id: string };
+}
+
+export async function getAnalyzeStatus(jobId: string, signal?: AbortSignal): Promise<AnalyzeStatus> {
+  return (await requestJson(`${API_BASE_URL}/api/analyze/${jobId}`, { signal })) as AnalyzeStatus;
 }

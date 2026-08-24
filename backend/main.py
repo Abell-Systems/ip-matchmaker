@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import os
+import uuid
 
 from dotenv import load_dotenv
 
@@ -140,49 +141,81 @@ def _validated(model_cls, items) -> list[dict]:
 _analyze_lock = asyncio.Lock()
 _ANALYZE_TIMEOUT_S = int(os.getenv("ANALYZE_TIMEOUT_SECONDS", "900"))
 
+# ponytail: in-memory job store — valid because deploys pin --max-instances=1
+# (see docs/deploy.md). Swap to Firestore only if multi-instance ever matters.
+_jobs: dict[str, dict] = {}
 
-@app.post("/api/analyze")
+
+# AnalyzeRequest (main.py:96) stays where it is — not redefined here.
+
+
+async def _execute_analysis(req: AnalyzeRequest) -> dict:
+    """Runs the agent graph for one cluster; returns candidates/verdicts/scorecards."""
+    session = await _session_service.create_session(app_name="ip_matchmaker", user_id="web")
+    prompt = (
+        f"Mine the patent landscape for domain '{req.domain}' (query: '{req.query}'), "
+        f"then propose, adversarially test, and score candidate inventions for cluster "
+        f"'{req.cluster_id}'."
+    )
+    msg = types.Content(role="user", parts=[types.Part(text=prompt)])
+
+    async def run() -> None:
+        async for _ in _runner.run_async(user_id="web", session_id=session.id, new_message=msg):
+            pass
+
+    try:
+        # timeout is applied by _run_job's outer wait_for — one layer, not two
+        await run()
+        final = await _session_service.get_session(
+            app_name="ip_matchmaker", user_id="web", session_id=session.id
+        )
+        final_state = final.state or {}
+        return {
+            "candidates": _validated(InventionCandidate, final_state.get(CANDIDATE_INVENTIONS)),
+            "verdicts": _validated(AdversarialVerdict, final_state.get(ADVERSARIAL_VERDICTS)),
+            "scorecards": _validated(ScoreCard, final_state.get(SCORED_CANDIDATES)),
+        }
+    finally:
+        await _session_service.delete_session(
+            app_name="ip_matchmaker", user_id="web", session_id=session.id
+        )
+
+
+async def _run_job(job_id: str, req: AnalyzeRequest) -> None:
+    async with _analyze_lock:
+        try:
+            result = await asyncio.wait_for(_execute_analysis(req), timeout=_ANALYZE_TIMEOUT_S)
+            _jobs[job_id] = {"status": "done", **result}
+        except TimeoutError:
+            _jobs[job_id] = {
+                "status": "error",
+                "detail": f"Agent run exceeded {_ANALYZE_TIMEOUT_S}s.",
+            }
+        except Exception as exc:
+            logger.exception("analyze job %s failed", job_id)
+            _jobs[job_id] = {"status": "error", "detail": str(exc)[:300]}
+
+
+@app.post("/api/analyze", status_code=202)
 async def analyze(req: AnalyzeRequest) -> dict:
-    """Runs the full agent graph (research -> inventor/adversarial loop ->
-    governor) for one cluster and returns its candidates, verdicts, and
-    scorecards. Rate-limited to the free-tier quota via RateLimiter — do not
-    call this endpoint in a tight loop from the frontend or tests."""
+    """Kicks off the full agent graph (research -> inventor/adversarial loop ->
+    governor) in the background and returns a job id immediately. Poll
+    GET /api/analyze/{job_id}; only one run may be in flight at a time."""
     if _analyze_lock.locked():
         raise HTTPException(status_code=503, detail="An analyze run is already in progress.")
-    async with _analyze_lock:
-        session = await _session_service.create_session(app_name="ip_matchmaker", user_id="web")
-        prompt = (
-            f"Mine the patent landscape for domain '{req.domain}' (query: '{req.query}'), "
-            f"then propose, adversarially test, and score candidate inventions for cluster "
-            f"'{req.cluster_id}'."
-        )
-        msg = types.Content(role="user", parts=[types.Part(text=prompt)])
+    job_id = uuid.uuid4().hex
+    _jobs[job_id] = {"status": "running"}
+    asyncio.create_task(_run_job(job_id, req))
+    return {"job_id": job_id, "status": "running"}
 
-        async def run() -> None:
-            async for _ in _runner.run_async(user_id="web", session_id=session.id, new_message=msg):
-                pass
 
-        try:
-            try:
-                await asyncio.wait_for(run(), timeout=_ANALYZE_TIMEOUT_S)
-            except TimeoutError:
-                raise HTTPException(
-                    status_code=504,
-                    detail=f"Agent run exceeded {_ANALYZE_TIMEOUT_S}s.",
-                ) from None
-            final = await _session_service.get_session(
-                app_name="ip_matchmaker", user_id="web", session_id=session.id
-            )
-            state = final.state or {}
-            return {
-                "candidates": _validated(InventionCandidate, state.get(CANDIDATE_INVENTIONS)),
-                "verdicts": _validated(AdversarialVerdict, state.get(ADVERSARIAL_VERDICTS)),
-                "scorecards": _validated(ScoreCard, state.get(SCORED_CANDIDATES)),
-            }
-        finally:
-            await _session_service.delete_session(
-                app_name="ip_matchmaker", user_id="web", session_id=session.id
-            )
+@app.get("/api/analyze/{job_id}")
+async def analyze_status(job_id: str) -> dict:
+    """Poll endpoint for a background analyze run."""
+    job = _jobs.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Unknown job id.")
+    return job
 
 
 if __name__ == "__main__":
