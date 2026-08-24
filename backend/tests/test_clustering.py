@@ -4,7 +4,7 @@ os.environ.setdefault("USE_MOCK_BIGQUERY", "true")
 
 from patent_agent.tools.bigquery_patents import MockPatentsDataSource
 from patent_agent.tools.clustering import cluster_patents, cluster_patents_tool
-from patent_agent.tools.schemas import DemandSignal, PatentCluster
+from patent_agent.tools.schemas import DemandSignal, PatentCluster, PatentRecord
 
 
 def test_cluster_patents_groups_by_cpc_prefix():
@@ -73,3 +73,17 @@ def test_cluster_patents_tool_returns_dicts():
     assert len(result) > 0
     assert all(isinstance(c, dict) for c in result)
     assert all("white_space_score" in c for c in result)
+
+
+def test_malformed_filing_date_does_not_crash():
+    record = PatentRecord(
+        publication_number="US-1",
+        title="t",
+        abstract="a",
+        filing_date="not-a-date",
+        publication_date="2025-06-01",
+        country_code="US",
+        cpc_codes=["H01M10/0562"],
+    )
+    clusters = cluster_patents([record], current_year=2026)
+    assert len(clusters) == 1

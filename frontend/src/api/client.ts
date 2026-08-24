@@ -1,8 +1,6 @@
-// Thin fetch wrapper for the backend. getLandscape hits the LLM-free
-// /api/landscape endpoint (research + clustering only, no Gemini call needed),
-// which is real and working. Endpoints for the Gemini-backed agents
-// (inventor/adversarial/governor) land once GEMINI_API_KEY is wired in — see
-// docs/roadmap.md.
+// Thin fetch wrapper for the backend. getLandscape hits the deterministic
+// /api/landscape endpoint (research + clustering, no Gemini call); analyzeCluster
+// runs the full Gemini-backed agent graph via POST /api/analyze.
 
 import type {
   AdversarialVerdict,
@@ -12,12 +10,13 @@ import type {
   ScoreCard,
 } from "../types/patent";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
-export async function getHealth(): Promise<{ status: string }> {
-  const response = await fetch(`${API_BASE_URL}/health`);
+async function requestJson(url: string, init?: RequestInit): Promise<unknown> {
+  const response = await fetch(url, init);
   if (!response.ok) {
-    throw new Error(`Health check failed: ${response.status}`);
+    const body = await response.text().catch(() => "");
+    throw new Error(`Request failed (${response.status}): ${body.slice(0, 300)}`);
   }
   return response.json();
 }
@@ -33,13 +32,10 @@ export async function getLandscape(
   query: string,
   domain: string,
   maxResults = 20,
+  signal?: AbortSignal,
 ): Promise<LandscapeResponse> {
   const params = new URLSearchParams({ query, domain, max_results: String(maxResults) });
-  const response = await fetch(`${API_BASE_URL}/api/landscape?${params}`);
-  if (!response.ok) {
-    throw new Error(`Landscape request failed: ${response.status}`);
-  }
-  return response.json();
+  return (await requestJson(`${API_BASE_URL}/api/landscape?${params}`, { signal })) as LandscapeResponse;
 }
 
 export interface AnalyzeResponse {
@@ -52,14 +48,12 @@ export async function analyzeCluster(
   query: string,
   domain: string,
   clusterId: string,
+  signal?: AbortSignal,
 ): Promise<AnalyzeResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/analyze`, {
+  return (await requestJson(`${API_BASE_URL}/api/analyze`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ query, domain, cluster_id: clusterId }),
-  });
-  if (!response.ok) {
-    throw new Error(`Analyze request failed: ${response.status}`);
-  }
-  return response.json();
+    signal,
+  })) as AnalyzeResponse;
 }

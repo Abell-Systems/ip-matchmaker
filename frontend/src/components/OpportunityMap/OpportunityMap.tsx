@@ -25,15 +25,21 @@ export function OpportunityMap() {
   );
 
   useEffect(() => {
+    const controller = new AbortController();
     setClusters(null);
     setError(null);
     setExpandedClusterId(null);
-    getLandscape(search.query, search.domain, 20)
+    setAnalysis({});
+    getLandscape(search.query, search.domain, 20, controller.signal)
       .then((data) => {
         setClusters(data.clusters);
         setPatents(data.patents);
       })
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) return;
+        setError(err instanceof Error ? err.message : String(err));
+      });
+    return () => controller.abort();
   }, [search]);
 
   function handleSubmit(e: React.FormEvent) {
@@ -46,6 +52,7 @@ export function OpportunityMap() {
   }
 
   function handleAnalyze(clusterId: string) {
+    if (analysis[clusterId] === "loading") return;
     setAnalysis((prev) => ({ ...prev, [clusterId]: "loading" }));
     analyzeCluster(search.query, search.domain, clusterId)
       .then((data) => setAnalysis((prev) => ({ ...prev, [clusterId]: data })))
@@ -67,13 +74,17 @@ export function OpportunityMap() {
       </form>
 
       {error && (
-        <div className={styles.placeholder}>
+        <div className={styles.placeholder} role="status" aria-live="polite">
           <p>Could not load landscape from the backend: {error}</p>
           <p>Is the backend running? See README.md for spin-up instructions.</p>
         </div>
       )}
 
-      {!error && !clusters && <div className={styles.placeholder}>Loading patent landscape…</div>}
+      {!error && !clusters && (
+        <div className={styles.placeholder} role="status" aria-live="polite">
+          Loading patent landscape…
+        </div>
+      )}
 
       {!error && clusters && (
         <>
@@ -83,6 +94,7 @@ export function OpportunityMap() {
           <div className={styles.grid}>
             {clusters.map((cluster) => {
               const expanded = expandedClusterId === cluster.cluster_id;
+              const clusterAnalysis = analysis[cluster.cluster_id];
               return (
                 <article key={cluster.cluster_id} className={styles.card}>
                   <button
@@ -92,7 +104,7 @@ export function OpportunityMap() {
                     aria-expanded={expanded}
                   >
                     <header className={styles.cardHeader}>
-                      <h3>{cluster.label}</h3>
+                      <h2>{cluster.label}</h2>
                       {cluster.is_white_space && <span className={styles.badge}>white space</span>}
                     </header>
                     <dl className={styles.stats}>
@@ -128,27 +140,27 @@ export function OpportunityMap() {
                         type="button"
                         className={styles.analyzeButton}
                         onClick={() => handleAnalyze(cluster.cluster_id)}
+                        disabled={clusterAnalysis === "loading"}
                       >
                         Propose &amp; score inventions for this cluster
                       </button>
-                      {analysis[cluster.cluster_id] === "loading" && (
-                        <p className={styles.patentMeta}>
+                      {clusterAnalysis === "loading" && (
+                        <p className={styles.patentMeta} role="status" aria-live="polite">
                           Running inventor/adversarial/governor agents… (this takes a couple of
                           minutes)
                         </p>
                       )}
-                      {analysis[cluster.cluster_id] === "error" && (
-                        <p className={styles.patentMeta}>Analysis failed — check backend logs.</p>
+                      {clusterAnalysis === "error" && (
+                        <p className={styles.patentMeta} role="status" aria-live="polite">
+                          Analysis failed — check backend logs.
+                        </p>
                       )}
-                      {analysis[cluster.cluster_id] &&
-                        analysis[cluster.cluster_id] !== "loading" &&
-                        analysis[cluster.cluster_id] !== "error" && (
-                          <ul className={styles.patentList}>
-                            {(analysis[cluster.cluster_id] as AnalyzeResponse).scorecards.map(
-                              (card) => {
-                                const candidate = (
-                                  analysis[cluster.cluster_id] as AnalyzeResponse
-                                ).candidates.find((c) => c.candidate_id === card.candidate_id);
+                      {clusterAnalysis && clusterAnalysis !== "loading" && clusterAnalysis !== "error" && (
+                        <ul className={styles.patentList}>
+                          {clusterAnalysis.scorecards.map((card) => {
+                            const candidate = clusterAnalysis.candidates.find(
+                              (c) => c.candidate_id === card.candidate_id,
+                            );
                                 return (
                                   <li key={card.candidate_id}>
                                     <strong>{candidate?.title ?? card.candidate_id}</strong>
@@ -167,7 +179,7 @@ export function OpportunityMap() {
                             )}
                           </ul>
                         )}
-                    </>
+                     </>
                   )}
                 </article>
               );
