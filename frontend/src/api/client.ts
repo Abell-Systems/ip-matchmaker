@@ -4,7 +4,13 @@
 // (inventor/adversarial/governor) land once GEMINI_API_KEY is wired in — see
 // docs/roadmap.md.
 
-import type { PatentCluster, PatentRecord } from "../types/patent";
+import type {
+  AdversarialVerdict,
+  InventionCandidate,
+  PatentCluster,
+  PatentRecord,
+  ScoreCard,
+} from "../types/patent";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
 
@@ -32,6 +38,28 @@ export async function getLandscape(
   const response = await fetch(`${API_BASE_URL}/api/landscape?${params}`);
   if (!response.ok) {
     throw new Error(`Landscape request failed: ${response.status}`);
+  }
+  return response.json();
+}
+
+export interface AnalyzeResponse {
+  candidates: InventionCandidate[];
+  verdicts: AdversarialVerdict[];
+  scorecards: ScoreCard[];
+}
+
+export async function analyzeCluster(
+  query: string,
+  domain: string,
+  clusterId: string,
+): Promise<AnalyzeResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/analyze`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ query, domain, cluster_id: clusterId }),
+  });
+  if (!response.ok) {
+    throw new Error(`Analyze request failed: ${response.status}`);
   }
   return response.json();
 }

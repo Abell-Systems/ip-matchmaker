@@ -81,3 +81,9 @@ class ScoreCard(BaseModel):
     evidence: float
     supporting_evidence: list[str] = Field(min_length=1)
     summary: str
+
+
+class ScoreCardList(BaseModel):
+    """Governor output_schema wrapper: ADK structured output needs a single model."""
+
+    scorecards: list[ScoreCard] = Field(min_length=1)

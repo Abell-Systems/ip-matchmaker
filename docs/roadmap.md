@@ -13,7 +13,7 @@ This roadmap replaces the original 24-48h hackathon-sprint scope with a 15-day p
 
 Every submission to this hackathon must satisfy all of these — keep this list current through Day 15:
 
-- [ ] **Gemini 3.5+** used via Gemini API or Vertex AI (pinned in `backend/patent_agent/config.py`, model wired into all 4 `LlmAgent`s — **blocked: no `GEMINI_API_KEY` yet, so no real Gemini call has actually been made**)
+- [x] **Gemini 3.5+** used via Gemini API or Vertex AI (pinned in `backend/patent_agent/config.py`, model wired into all 4 `LlmAgent`s — **fully validated live**: a real `gemini-3.5-flash` run confirmed `research_agent`, `inventor_agent`, and `adversarial_agent`, and a budgeted `gemini-3.5-flash-lite` run on Aug 24 reached `governor_agent` with a complete cited `ScoreCard`; see Days 10-11 below)
 - [x] **Google Agent Framework**: Google ADK (Python) — all 4 agents + `LoopAgent`/`SequentialAgent` orchestration built, wired, and unit-tested (agent graph imports and composes correctly under `google-adk` 2.7.0)
 - [ ] **Google Cloud infra service**: Cloud Run (backend built and Docker-buildable, **not yet deployed** — blocked: no GCP project/credentials yet); BigQuery also counts as a second infra service once wired to real credentials
 - [ ] Hosted project URL (Cloud Run service URL, once deployed)
@@ -23,7 +23,7 @@ Every submission to this hackathon must satisfy all of these — keep this list 
 - [ ] Architecture diagram (see `docs/architecture.md`)
 - [ ] ~4 min demo video that **visibly shows the backend running on Google Cloud** (Cloud Run dashboard, Vertex AI logs, or the `.run.app` URL — not just localhost)
 
-**Blocked on credentials (need from the team, not more engineering time):** a real `GEMINI_API_KEY` (or Vertex AI access) and a GCP project to deploy Cloud Run against. Everything else buildable without them is done — see the Days 1-6 status below.
+**Blocked on credentials (need from the team, not more engineering time):** a GCP project to deploy Cloud Run against. A `GEMINI_API_KEY` now exists (Vertex express-mode key via plain Gemini API, see Days 7-9 status) and all 4 agents are live-validated — the free tier's **20 req/day per model** cap is workable with the budgeted run combo recorded in Resolved decisions below. Everything else buildable without a GCP project is done — see the Days 1-11 status below.
 
 Optional bonus points (not required, worth considering only if Days 14-15 have slack): public blog/video about the build process; social post with `#AllThingsAgenticHackathon`; integrating another Google AI model (Gemma/Veo/Lyria) — low priority, cut first if time is tight.
 
@@ -58,22 +58,22 @@ Rationale:
 - Freeze the output schema (cluster → representative patents → white-space score) by end of Day 6 so the frontend (Days 12-13) has a stable contract to build against — **done and already consumed**: the frontend's `OpportunityMap` renders real `PatentCluster` data from `GET /api/landscape` today, ahead of schedule (not the full Invention Opportunity Map, just proof the contract holds end to end).
 - **Definition of done:** given the locked domain, the pipeline outputs a ranked list of white-space clusters with supporting patent IDs — this is the visual/narrative backbone of the whole demo.
 
-### Days 7-9 — Inventor Agent + Adversarial Agent
+### Days 7-9 — Inventor Agent + Adversarial Agent ✅ done, validated live
 - **Named milestone, before starting this phase:** validate the leading white-space candidate with a domain-knowledgeable person (even informally) — the risk being called out explicitly is discovering on Day 12 that the "discovery" is already patented.
 - Build `inventor_agent` (proposes candidate inventions from a white-space cluster) and `adversarial_agent` (attacks each candidate using prior art, must cite the specific patents it used).
 - Wire them as an ADK `LoopAgent` (propose → critique → repeat) so multiple prompt iterations and curation passes happen automatically instead of ad hoc reruns; adversarial agent calls `exit_loop` when a candidate survives scrutiny or `max_iterations` is hit.
 - Iterate the Inventor prompt multiple times — with 15 days there's room to actually curate which candidates are interesting instead of accepting the first output.
-- **Definition of done:** for the locked domain, the loop produces at least 3-5 candidate inventions with attached adversarial verdicts (accept/reject + cited patents) via `adk web`.
+- **Definition of done:** for the locked domain, the loop produces at least 3-5 candidate inventions with attached adversarial verdicts (accept/reject + cited patents) via `adk web`. **Done** — a live `gemini-3.5-flash` run (`backend/run_pipeline.py`) confirmed `inventor_agent` proposing coherent, novel candidates (e.g. "Zwitterionic Polyimide MLD Interfacial Buffer Layer") and `adversarial_agent` rejecting a candidate while citing 4 specific publication numbers, with the inventor visibly iterating afterward — the propose→critique loop works end-to-end against a real model, not just structurally.
 
-### Days 10-11 — Innovation Governor
+### Days 10-11 — Innovation Governor ✅ done, validated live
 - Build `governor_agent`: scores surviving candidates on **novelty, prior-art risk, differentiation, evidence** — every score must cite concrete `publication_number`s in `supporting_evidence`, never a bare number. This is where "Architectural Discipline" (30% of judging) is won or lost.
-- **Definition of done:** `governor_agent` outputs a `ScoreCard` per candidate with all 4 sub-scores and non-empty evidence citations, consumable directly by the frontend.
+- **Definition of done:** `governor_agent` outputs a `ScoreCard` per candidate with all 4 sub-scores and non-empty evidence citations, consumable directly by the frontend. **Done** — a live run on Aug 24 (`backend/run_pipeline.py`, `INVENTION_LOOP_MAX_ITERATIONS=1`, `gemini-3.5-flash-lite`) reached `governor_agent` and produced a full `ScoreCard`: candidate *"In-Situ Formed Halide-Borate Composite SEI via Vapor-Phase Halogenation"* (`INV-C01B-001`) scored novelty 0.92 / prior_art_risk 0.85 / differentiation 0.88 / evidence 0.95, with `supporting_evidence` citing `US-10448361-B2-17` (plus `US-10437821-B2-0`, `US-11226419-B2-0`) — all traceable `publication_number`s printed in the same run's landscape/candidates sections. The quota budget that made this work is recorded in Resolved decisions below.
 
-### Days 12-13 — UX / Visualization (Lydia)
+### Days 12-13 — UX / Visualization (Lydia) — started early, ahead of schedule
 - Backend endpoints **frozen at the start of Day 12** — no schema changes during frontend work.
 - Build the Invention Opportunity Map (React + Vite) — the landscape clusters plotted with white-space candidates surfaced, plus the researcher interaction flow.
 - Wire the "explain your reasoning" toggle (see §4).
-- **Definition of done:** a researcher can pick a cluster, see candidate inventions, see their scores, and expand "why" to see the cited patents behind both the adversarial verdict and the governor score.
+- **Definition of done:** a researcher can pick a cluster, see candidate inventions, see their scores, and expand "why" to see the cited patents behind both the adversarial verdict and the governor score. **Partial progress, ahead of schedule:** `OpportunityMap` now has a user-editable query/domain search form and expandable cluster cards that drill down to representative patents (Aug 24) — still built only against the frozen `/api/landscape` (clusters + patents, no LLM). Candidate inventions / scores / "explain" toggle against `AdversarialVerdict.cited_patents` and `ScoreCard.supporting_evidence` remain blocked on Days 10-11 landing (governor endpoint not yet live-validated).
 
 ### Days 14-15 — Demo rehearsal, script, buffer
 - Reserved unconditionally — this is what gets cut first when development overruns, and it's what most penalizes the final presentation.
@@ -114,3 +114,6 @@ The Adversarial Agent's `AdversarialVerdict.cited_patents` and the Governor's `S
 | Demo domain | Locked to **solid-state electrolytes for EV batteries** (see §2 for rationale) | Aug 15 |
 | `LoopAgent`/`SequentialAgent` deprecation warning | `google-adk` 2.7.0 emits `DeprecationWarning` for both in favor of a new `Workflow` API. Explicit decision: **stay on `LoopAgent`/`SequentialAgent` for now**, because `Workflow` cannot yet be used as an `LlmAgent` sub-agent (per the installed version's own warning text) — `invention_loop` is exactly that case, nested inside the root `SequentialAgent`. Migrating today would mean building on an API that doesn't yet support our topology. Re-evaluate once a `google-adk` release documents `Workflow` supporting nested `LlmAgent` sub-agents, or by Day 10 at the latest so it isn't a last-minute scramble if the classes are actually removed. Comment left in `backend/patent_agent/agent.py`. | Aug 15 |
 | Day 4-6 clustering approach | Implemented as a **CPC-prefix heuristic** (density + recency + citation velocity), not embeddings — deliberately credential-free so it works before `GEMINI_API_KEY` exists. Real embedding-based clustering (Gemini embeddings + HDBSCAN/KMeans) is the documented upgrade path once a key is available; the `PatentCluster` output contract doesn't need to change. See `backend/patent_agent/tools/clustering.py`. | Aug 15 |
+| Gemini API key path | A Vertex express-mode key (`AQ.…`) works via the plain Gemini API with `GOOGLE_GENAI_USE_VERTEXAI=false` + `GEMINI_API_KEY` set — no Vertex AI API enablement, GCP project, or billing needed. Do **not** also set `GOOGLE_CLOUD_PROJECT`/`GOOGLE_CLOUD_LOCATION`; the SDK then ignores the key. Same gotcha applies to the Cloud Run env vars in `docs/deploy.md`. | Aug 24 |
+| Free-tier quota budget | Confirmed by the first live full-graph run: 5 req/min and **20 req/day per model**, vs. ~20+ calls for one full graph run. `governor_agent` was cut off by the daily cap. Mitigation for the next run: `INVENTION_LOOP_MAX_ITERATIONS=1`, frugal prompts, or `gemini-3.5-flash-lite` (separate per-model quota bucket) for validation runs, reserving `flash` for the recorded demo. | Aug 24 |
+| Governor-validation run budget | **`INVENTION_LOOP_MAX_ITERATIONS=1` + `GEMINI_MODEL=gemini-3.5-flash-lite`** fits comfortably under the daily cap: one full graph pass (research → 1× inventor/adversarial → governor) ≈ 4-6 calls, confirmed by the successful Aug 24 validation run that reached `governor_agent`. Use this combo for any further end-to-end runs until quota resets or a paid tier exists. | Aug 24 |

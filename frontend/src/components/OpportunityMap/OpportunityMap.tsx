@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
-import { getLandscape } from "../../api/client";
+import { analyzeCluster, getLandscape } from "../../api/client";
+import type { AnalyzeResponse } from "../../api/client";
 import type { PatentCluster, PatentRecord } from "../../types/patent";
 import styles from "./OpportunityMap.module.css";
 
-// Real-but-minimal view of the LLM-free research+clustering pipeline
-// (/api/landscape). The full Invention Opportunity Map — candidate
-// inventions, scores, "explain" drill-down — lands Days 12-13 once the
-// Gemini-backed agents (inventor/adversarial/governor) have a real API key.
-// Query/domain are user-editable and clusters expand to their representative
-// patents; still entirely backed by mock data, no LLM calls involved.
+// Patent landscape view (/api/landscape): user-editable query/domain search,
+// clusters expandable to their representative patents. Expanded cards can run
+// the full Gemini-backed agent graph (inventor/adversarial/governor) via
+// POST /api/analyze and show scored, citation-backed candidates.
 
 const DEFAULT_DOMAIN = "solid-state battery electrolytes";
 const DEFAULT_QUERY = "solid electrolyte interphase";
@@ -21,6 +20,9 @@ export function OpportunityMap() {
   const [patents, setPatents] = useState<PatentRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [expandedClusterId, setExpandedClusterId] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<Record<string, AnalyzeResponse | "loading" | "error">>(
+    {},
+  );
 
   useEffect(() => {
     setClusters(null);
@@ -41,6 +43,13 @@ export function OpportunityMap() {
 
   function patentByNumber(publicationNumber: string): PatentRecord | undefined {
     return patents.find((p) => p.publication_number === publicationNumber);
+  }
+
+  function handleAnalyze(clusterId: string) {
+    setAnalysis((prev) => ({ ...prev, [clusterId]: "loading" }));
+    analyzeCluster(search.query, search.domain, clusterId)
+      .then((data) => setAnalysis((prev) => ({ ...prev, [clusterId]: data })))
+      .catch(() => setAnalysis((prev) => ({ ...prev, [clusterId]: "error" })));
   }
 
   return (
@@ -98,30 +107,75 @@ export function OpportunityMap() {
                     </p>
                   </button>
                   {expanded && (
-                    <ul className={styles.patentList}>
-                      {cluster.representative_patents.map((pubNumber) => {
-                        const patent = patentByNumber(pubNumber);
-                        if (!patent) return <li key={pubNumber}>{pubNumber}</li>;
-                        return (
-                          <li key={pubNumber}>
-                            <strong>{patent.title}</strong>
-                            <p>{patent.abstract}</p>
-                            <p className={styles.patentMeta}>
-                              {patent.assignee.join(", ")} · {patent.publication_date} ·{" "}
-                              {patent.citation_count} citations
-                            </p>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                    <>
+                      <ul className={styles.patentList}>
+                        {cluster.representative_patents.map((pubNumber) => {
+                          const patent = patentByNumber(pubNumber);
+                          if (!patent) return <li key={pubNumber}>{pubNumber}</li>;
+                          return (
+                            <li key={pubNumber}>
+                              <strong>{patent.title}</strong>
+                              <p>{patent.abstract}</p>
+                              <p className={styles.patentMeta}>
+                                {patent.assignee.join(", ")} · {patent.publication_date} ·{" "}
+                                {patent.citation_count} citations
+                              </p>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      <button
+                        type="button"
+                        className={styles.analyzeButton}
+                        onClick={() => handleAnalyze(cluster.cluster_id)}
+                      >
+                        Propose &amp; score inventions for this cluster
+                      </button>
+                      {analysis[cluster.cluster_id] === "loading" && (
+                        <p className={styles.patentMeta}>
+                          Running inventor/adversarial/governor agents… (this takes a couple of
+                          minutes)
+                        </p>
+                      )}
+                      {analysis[cluster.cluster_id] === "error" && (
+                        <p className={styles.patentMeta}>Analysis failed — check backend logs.</p>
+                      )}
+                      {analysis[cluster.cluster_id] &&
+                        analysis[cluster.cluster_id] !== "loading" &&
+                        analysis[cluster.cluster_id] !== "error" && (
+                          <ul className={styles.patentList}>
+                            {(analysis[cluster.cluster_id] as AnalyzeResponse).scorecards.map(
+                              (card) => {
+                                const candidate = (
+                                  analysis[cluster.cluster_id] as AnalyzeResponse
+                                ).candidates.find((c) => c.candidate_id === card.candidate_id);
+                                return (
+                                  <li key={card.candidate_id}>
+                                    <strong>{candidate?.title ?? card.candidate_id}</strong>
+                                    <p>{card.summary}</p>
+                                    <p className={styles.patentMeta}>
+                                      novelty {card.novelty} · prior-art risk {card.prior_art_risk}{" "}
+                                      · differentiation {card.differentiation} · evidence{" "}
+                                      {card.evidence}
+                                    </p>
+                                    <p className={styles.patentMeta}>
+                                      cited: {card.supporting_evidence.join(", ")}
+                                    </p>
+                                  </li>
+                                );
+                              },
+                            )}
+                          </ul>
+                        )}
+                    </>
                   )}
                 </article>
               );
             })}
           </div>
           <p className={styles.footnote}>
-            Candidate inventions, adversarial verdicts and governor scores appear here once the
-            Gemini-backed agents are wired to a real API key (see docs/roadmap.md).
+            Adversarial verdicts are shown in the backend run log; the cards above show each
+            surviving candidate with its governor scores and cited prior art.
           </p>
         </>
       )}

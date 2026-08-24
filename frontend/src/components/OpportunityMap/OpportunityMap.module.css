@@ -136,6 +136,17 @@
   word-break: break-all;
 }
 
+.analyzeButton {
+  font: inherit;
+  padding: 0.45rem 0.9rem;
+  margin-top: 0.75rem;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
 .footnote {
   margin-top: 1.5rem;
   font-size: 0.85rem;
