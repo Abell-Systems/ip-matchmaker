@@ -1,3 +1,71 @@
+.searchForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.searchForm label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.searchForm input {
+  font: inherit;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  min-width: 220px;
+}
+
+.searchForm button {
+  font: inherit;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cardToggle {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.patentList {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0.75rem 0 0;
+  border-top: 1px dashed currentColor;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.patentList p {
+  margin: 0.25rem 0 0;
+}
+
+.patentMeta {
+  opacity: 0.65;
+  font-size: 0.75rem;
+}
+
 .placeholder {
   border: 1px dashed currentColor;
   border-radius: 8px;
