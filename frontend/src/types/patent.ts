@@ -40,6 +40,20 @@ export interface AdversarialVerdict {
   cited_patents: string[];
 }
 
+export interface DemandSignal {
+  source: string;
+  id: string;
+  title: string;
+  description: string;
+  cpc_prefix: string | null;
+  posted_date: string;
+  url: string;
+}
+
+export interface ScoreCardList {
+  scorecards: ScoreCard[];
+}
+
 export interface ScoreCard {
   candidate_id: string;
   novelty: number;

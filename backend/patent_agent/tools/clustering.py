@@ -38,6 +38,14 @@ def _primary_prefix(record: PatentRecord) -> str:
     return _cpc_prefix(record.cpc_codes[0])
 
 
+def _filing_year(record: PatentRecord, current_year: int) -> int:
+    """Filing year, or the current year (age 1) for malformed dates from real sources."""
+    try:
+        return int(record.filing_date[:4])
+    except ValueError:
+        return current_year
+
+
 def cluster_patents(
     patents: list[PatentRecord],
     demand_signals: list[DemandSignal] | None = None,
@@ -76,7 +84,7 @@ def cluster_patents(
         count = len(records)
         density_norm = count / max_count
 
-        ages = [max(1, year - int(r.filing_date[:4])) for r in records]
+        ages = [max(1, year - _filing_year(r, year)) for r in records]
         avg_age = sum(ages) / len(ages)
         recency_norm = max(0.0, min(1.0, 1 - (avg_age / 20)))
 

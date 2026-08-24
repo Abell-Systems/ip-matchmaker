@@ -51,8 +51,8 @@ npm run lint        # oxlint
 
 Backend is a Python **Google ADK** agent graph, wrapped by a thin FastAPI app
 (`backend/main.py`) that serves as the Cloud Run entrypoint. Frontend is a React + Vite
-SPA that currently renders one live piece of the pipeline (`OpportunityMap`) via a
-plain REST endpoint — it does not yet talk to the ADK Runner/Gemini.
+SPA that renders the pipeline via two plain REST endpoints — it does not talk to the
+ADK web protocol directly.
 
 ### Agent graph (`backend/patent_agent/agent.py`)
 
@@ -75,11 +75,12 @@ API, but are deliberately still used here because `Workflow` can't yet nest as a
 
 Not everything in the pipeline is an LLM call. The clustering step
 (`backend/patent_agent/tools/clustering.py`) is a plain `FunctionTool` — a CPC-prefix
-heuristic (`white_space_score = 0.5·(1-density) + 0.3·recency + 0.2·citation_velocity`),
-deliberately credential-free. `GET /api/landscape` in `backend/main.py` calls
-`search_patents_tool` + `cluster_patents_tool` directly, bypassing the ADK
-Runner/Gemini entirely — this is the only backend path currently exercised by the
-frontend, and works with zero external credentials.
+heuristic (`white_space_score = 0.4·(1-density) + 0.2·recency + 0.15·citation_velocity
++ 0.25·demand`), deliberately credential-free. `GET /api/landscape` in `backend/main.py`
+calls the patents/demand data sources + `cluster_patents` directly, bypassing the ADK
+Runner/Gemini — it works with zero external credentials. `POST /api/analyze` runs the
+full agent graph for one cluster (requires GEMINI_API_KEY); both endpoints are used by
+the frontend's OpportunityMap component.
 
 ### Mock/real data swap
 

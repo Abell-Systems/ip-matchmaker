@@ -71,5 +71,10 @@ class BigQueryPatentsDataSource:
 def get_patents_datasource() -> PatentsDataSource:
     if os.getenv("USE_MOCK_BIGQUERY", "true").lower() == "true":
         return MockPatentsDataSource()
-    project = os.environ["GOOGLE_CLOUD_PROJECT"]
+    project = os.getenv("GOOGLE_CLOUD_PROJECT")
+    if not project:
+        raise RuntimeError(
+            "USE_MOCK_BIGQUERY=false requires GOOGLE_CLOUD_PROJECT to be set "
+            "(and BigQuery credentials to be available)."
+        )
     return BigQueryPatentsDataSource(project=project)
