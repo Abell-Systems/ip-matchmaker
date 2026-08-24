@@ -31,6 +31,8 @@ User query (domain/prompt)
   → frontend Invention Opportunity Map (cluster view → candidates → scores → "explain" drill-down)
 ```
 
+`POST /api/analyze` kicks off this graph as a background `asyncio` task and returns `202 {job_id, status: "running"}` immediately (a multi-minute Gemini run must not block the request). The frontend polls `GET /api/analyze/{job_id}` every few seconds until `status` is `"done"` (with `candidates`/`verdicts`/`scorecards`) or `"error"`. Only one run may be in flight at a time (`_analyze_lock`); jobs live in an in-memory dict — safe only because Cloud Run is pinned to `--max-instances=1` (see `docs/deploy.md`), swap to Firestore first if that ever changes.
+
 ## Shared state table
 
 | State key | Producer | Consumer(s) |
