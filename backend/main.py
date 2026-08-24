@@ -146,9 +146,6 @@ _ANALYZE_TIMEOUT_S = int(os.getenv("ANALYZE_TIMEOUT_SECONDS", "900"))
 _jobs: dict[str, dict] = {}
 
 
-# AnalyzeRequest (main.py:96) stays where it is — not redefined here.
-
-
 async def _execute_analysis(req: AnalyzeRequest) -> dict:
     """Runs the agent graph for one cluster; returns candidates/verdicts/scorecards."""
     session = await _session_service.create_session(app_name="ip_matchmaker", user_id="web")
