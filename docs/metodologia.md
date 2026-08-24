@@ -1,6 +1,6 @@
 # Metodología — Agente de Innovación de Patentes
 
-*Especificación formal del método, pensada como base metodológica para publicación científica. Refleja el código en `backend/patent_agent/` tal cual está implementado (agosto de 2026). Versión en inglés disponible bajo petición.*
+*Especificación formal del método, pensada como base metodológica para publicación científica. Refleja el código en `backend/patent_agent/` tal cual está implementado (agosto de 2026). Versión en inglés: [methodology.md](methodology.md).*
 
 ---
 
