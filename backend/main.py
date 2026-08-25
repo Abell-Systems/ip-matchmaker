@@ -70,8 +70,6 @@ def health() -> dict:
     }
 
 
-
-
 @app.get("/api/landscape")
 def get_landscape(
     query: str = Query(min_length=1),
@@ -105,9 +103,9 @@ _runner = Runner(
 
 
 class AnalyzeRequest(BaseModel):
-    query: str = Field(min_length=1)
     domain: str = Field(min_length=1)
-    cluster_id: str = Field(min_length=1)
+    query: str = Field(default="solid electrolyte interphase")
+    cluster_id: str | None = None
 
 
 def _as_list(value) -> list:
@@ -156,22 +154,67 @@ _ANALYZE_TIMEOUT_S = int(os.getenv("ANALYZE_TIMEOUT_SECONDS", "900"))
 _jobs: dict[str, dict] = {}
 
 
-async def _execute_analysis(req: AnalyzeRequest) -> dict:
+async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
     """Runs the agent graph for one cluster; returns candidates/verdicts/scorecards."""
+    _jobs[job_id]["stage"] = "researching"
+    _jobs[job_id]["progress"] = {}
+    
+    records = get_patents_datasource().search_patents(req.query, req.domain, max_results=20)
+    demand_signals = get_demand_datasource().search_demand(req.query, req.domain)
+    _jobs[job_id]["progress"]["patentsAnalyzed"] = len(records)
+    
+    _jobs[job_id]["stage"] = "clustering"
+    clusters = cluster_patents(records, demand_signals)
+    _jobs[job_id]["progress"]["clustersFound"] = len(clusters)
+    _jobs[job_id]["clusters"] = [c.model_dump() for c in clusters]
+    
+    cluster_id = req.cluster_id or (clusters[0].cluster_id if clusters else "unknown")
+    
+    _jobs[job_id]["stage"] = "inventing"
+    
     session = await _session_service.create_session(app_name="ip_matchmaker", user_id="web")
     prompt = (
         f"Mine the patent landscape for domain '{req.domain}' (query: '{req.query}'), "
         f"then propose, adversarially test, and score candidate inventions for cluster "
-        f"'{req.cluster_id}'."
+        f"'{cluster_id}'."
     )
     msg = types.Content(role="user", parts=[types.Part(text=prompt)])
 
     async def run() -> None:
         async for _ in _runner.run_async(user_id="web", session_id=session.id, new_message=msg):
-            pass
+            curr = await _session_service.get_session(
+                app_name="ip_matchmaker", user_id="web", session_id=session.id
+            )
+            state = curr.state or {}
+            
+            cands = _as_list(state.get(CANDIDATE_INVENTIONS))
+            if cands:
+                _jobs[job_id]["progress"]["candidatesGenerated"] = len(cands)
+                
+            verdicts = _as_list(state.get(ADVERSARIAL_VERDICTS))
+            if verdicts:
+                _jobs[job_id]["stage"] = "adversarial"
+                rej = 0
+                surv = 0
+                rev = 0
+                for v in verdicts:
+                    if isinstance(v, dict):
+                        v_str = str(v.get("verdict", "")).lower()
+                        if v_str == "rejected":
+                            rej += 1
+                        elif v_str == "survives":
+                            surv += 1
+                        elif v_str == "revised" or v_str == "revise":
+                            rev += 1
+                _jobs[job_id]["progress"]["candidatesRejected"] = rej
+                _jobs[job_id]["progress"]["candidatesRevised"] = rev
+                _jobs[job_id]["progress"]["candidatesSurvived"] = surv
+                
+            scores = _as_list(state.get(SCORED_CANDIDATES))
+            if scores:
+                _jobs[job_id]["stage"] = "governor"
 
     try:
-        # timeout is applied by _run_job's outer wait_for — one layer, not two
         await run()
         final = await _session_service.get_session(
             app_name="ip_matchmaker", user_id="web", session_id=session.id
@@ -191,16 +234,17 @@ async def _execute_analysis(req: AnalyzeRequest) -> dict:
 async def _run_job(job_id: str, req: AnalyzeRequest) -> None:
     async with _analyze_lock:
         try:
-            result = await asyncio.wait_for(_execute_analysis(req), timeout=_ANALYZE_TIMEOUT_S)
-            _jobs[job_id] = {"status": "done", **result}
+            result = await asyncio.wait_for(_execute_analysis(job_id, req), timeout=_ANALYZE_TIMEOUT_S)
+            _jobs[job_id] = {"status": "done", "stage": "done", **result}
         except TimeoutError:
             _jobs[job_id] = {
                 "status": "error",
+                "stage": "error",
                 "detail": f"Agent run exceeded {_ANALYZE_TIMEOUT_S}s.",
             }
         except Exception as exc:
             logger.exception("analyze job %s failed", job_id)
-            _jobs[job_id] = {"status": "error", "detail": str(exc)[:300]}
+            _jobs[job_id] = {"status": "error", "stage": "error", "detail": str(exc)[:300]}
 
 
 @app.post("/api/analyze", status_code=202)
@@ -211,9 +255,9 @@ async def analyze(req: AnalyzeRequest) -> dict:
     if _analyze_lock.locked():
         raise HTTPException(status_code=503, detail="An analyze run is already in progress.")
     job_id = uuid.uuid4().hex
-    _jobs[job_id] = {"status": "running"}
+    _jobs[job_id] = {"status": "running", "stage": "queued"}
     asyncio.create_task(_run_job(job_id, req))
-    return {"job_id": job_id, "status": "running"}
+    return {"job_id": job_id, "status": "running", "stage": "queued"}
 
 
 @app.get("/api/analyze/{job_id}")
