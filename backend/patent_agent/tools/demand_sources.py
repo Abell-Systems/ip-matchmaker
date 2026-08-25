@@ -1,16 +1,16 @@
-"""Demand-signal data source: a swappable interface over open technology-need feeds
-(SBIR.gov Topic API, CORDIS Data Extraction Tool API).
+"""Demand-signal data source: a swappable interface over open technology-need feeds.
 
-Defaults to a deterministic mock so the pipeline is developable and demoable before
-real API access exists. Flip USE_MOCK_DEMAND=false once real source implementations
-land — no other code needs to change, since every caller goes through
-get_demand_datasource().
+Supported sources (controlled via DEMAND_SOURCE env var):
+- "mock": MockDemandDataSource (default)
+- "innoget": InnogetDemandDataSource
+- "composite": Reserved for future aggregation (raises NotImplementedError)
 """
 
 import os
 from typing import Protocol
 
 from .demand_fixtures import generate_demand_signals
+from .innoget_datasource import InnogetDemandDataSource
 from .schemas import DemandSignal
 
 
@@ -40,6 +40,19 @@ class CORDISDemandDataSource:
 
 
 def get_demand_datasource() -> DemandDataSource:
-    if os.getenv("USE_MOCK_DEMAND", "true").lower() == "true":
+    """Factory for obtaining configured DemandDataSource instance."""
+    source_type = os.getenv("DEMAND_SOURCE", "").lower()
+
+    if not source_type:
+        # Fallback to legacy USE_MOCK_DEMAND
+        use_mock = os.getenv("USE_MOCK_DEMAND", "true").lower() == "true"
+        source_type = "mock" if use_mock else "innoget"
+
+    if source_type == "mock":
         return MockDemandDataSource()
-    raise NotImplementedError("Real demand sources (SBIR/CORDIS) not wired up yet.")
+    elif source_type == "innoget":
+        return InnogetDemandDataSource()
+    elif source_type == "composite":
+        raise NotImplementedError("Composite demand source not implemented yet.")
+    else:
+        raise ValueError(f"Unknown DEMAND_SOURCE: '{source_type}'. Supported values: 'mock', 'innoget', 'composite'.")
