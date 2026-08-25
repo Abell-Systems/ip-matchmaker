@@ -10,12 +10,12 @@ The User Zero Experience transforms the Patent Innovation Agent from a technical
 
 1. **Zero Technical Prerequisites**: No instructions, no configuration, no setup, no knowledge of Gemini, ADK, BigQuery, or multi-agent architectures required.
 2. **Unified Action ("Analyze opportunity")**: The user inputs a technology area and clicks a single primary CTA. The user sees one seamless process: Research → White-space → Invention → Challenge → Assessment.
-3. **Backend-Driven Truth**: Progress indicators reflect actual backend agent execution stages and counts (`stage` and `progress`), never simulated mock timelines.
+3. **Backend-Driven Truth**: Progress indicators reflect actual backend agent execution stages and counts (`stage` and `progress`), never simulated mock timelines or client-side fake timers.
 4. **Decision-Oriented Results**: Results answer human domain questions (*What is proposed? Why this opportunity? What challenged it? Why did it survive? Where is the evidence?*).
 5. **Problem-Domain Terminology**: Internal agent names are rendered in problem-domain terms:
    - "Adversarial Agent" → **Prior-art challenge**
    - "Governor Agent" → **Final assessment**
-6. **Transparent Causal Chain ("Why this candidate?")**: Step-by-step evidence tracing (`OPPORTUNITY` → `PRIOR ART` → `ADVERSARIAL ATTACK` → `REVISION` → `SURVIVAL` → `EVIDENCE`) without private chain-of-thought output.
+6. **Transparent Causal Chain ("Why this candidate?")**: Step-by-step evidence tracing (`OPPORTUNITY` → `PRIOR ART` → `PRIOR-ART CHALLENGE` → `REVISION` → `SURVIVAL` → `EVIDENCE`) backed strictly by real data without private chain-of-thought output.
 
 ---
 
@@ -35,6 +35,8 @@ type PipelineStage =
   | "done"
   | "error";
 ```
+
+*Note: `queued` is brief/transitional when the job starts immediately, switching to `researching` at once so the user perceives immediate activity.*
 
 #### Job Status Schema (`GET /api/analyze/{job_id}`)
 ```typescript
@@ -123,18 +125,18 @@ The UI operates in 3 distinct views:
   - Differentiation: `[87]`
   - Evidence rating: `[Strong]` (backed by citations)
 
-#### 2. "Why this candidate?" Causal Chain Drill-down
+#### 2. "Why this candidate?" Causal Chain Drill-down (Real Data Driven)
 Horizontal/vertical causal pipeline:
 ```
 [OPPORTUNITY] ➔ [PRIOR ART] ➔ [PRIOR-ART CHALLENGE] ➔ [REVISION] ➔ [SURVIVAL] ➔ [EVIDENCE]
 ```
-Clicking any node expands observable data:
-- `OPPORTUNITY`: Cluster details, white-space score, demand signal source.
-- `PRIOR ART`: Representative patent titles, abstracts, CPC codes.
-- `PRIOR-ART CHALLENGE`: Adversarial rationale & rejected candidate details.
-- `REVISION`: Specific adjustments made to survive prior art.
-- `SURVIVAL`: Differentiation proof.
-- `EVIDENCE`: Direct patent citations and claims.
+Each node links strictly to verified execution data:
+- `OPPORTUNITY`: Cluster label, white-space score, demand signal source.
+- `PRIOR ART`: Concrete patent numbers, titles, and abstracts analyzed.
+- `PRIOR-ART CHALLENGE`: Exact objections and prior-art attacks raised by the adversarial agent.
+- `REVISION`: Specific adjustments made to candidate claims.
+- `SURVIVAL`: Exact differentiation condition permitting survival.
+- `EVIDENCE`: Direct patent citations and claim references.
 
 ---
 
@@ -145,7 +147,7 @@ User Zero test scenario:
 2. Immediately understand purpose.
 3. Enter or leave default technology domain.
 4. Click `Analyze opportunity`.
-5. Observe live, authentic backend execution progress.
+5. Observe live, authentic backend execution progress with real metrics.
 6. Review decision-oriented candidate card.
 7. Understand why candidate survived and inspect evidence via causal chain.
 8. No developer intervention required.
