@@ -4,20 +4,20 @@ _Finds patentable white-space opportunities by mining patent landscapes, proposi
 
 Built for the **Devpost "All Things Agentic Hackathon"** (Google Cloud / Gemini) — track: **The Taskmaster**.
 
-> Status: Days 1-13 done, including a live-validated Gemini run through every agent (research → inventor/adversarial loop → governor) and an async, poll-based `/api/analyze` wired end-to-end into the frontend. CI (pytest + tsc/vite/oxlint) runs on every push and PR. Cloud Run deployment is still blocked on a GCP project/credentials. See [`docs/roadmap.md`](docs/roadmap.md) for the day-by-day plan and [`docs/architecture.md`](docs/architecture.md) for the system design.
+> Status: Live deployed on Google Cloud Run at [`https://patent-agent-873418702379.us-central1.run.app`](https://patent-agent-873418702379.us-central1.run.app). Full agent graph (research → inventor/adversarial loop → governor) live-validated. Async `/api/analyze` job endpoint wired into OpportunityMap frontend. CI (pytest + tsc/vite/oxlint) passing on every push/PR. See [`docs/roadmap.md`](docs/roadmap.md) and [`docs/architecture.md`](docs/architecture.md).
 
 ## Architecture
 
-See [`docs/architecture.md`](docs/architecture.md) for the full component breakdown and diagram (diagram itself lands around Day 13-14).
+See [`docs/architecture.md`](docs/architecture.md) for the full component breakdown and diagram.
 
 ## Features
 
-- ✅ Patent landscape search + CPC-prefix clustering with a white-space score (density + recency + citation velocity + demand), exposed at `GET /api/landscape` — works today with mock data, no credentials required.
-- ✅ Frontend `OpportunityMap` renders that landscape live (real data flow, not a placeholder): search, expandable cluster cards, and a candidate/scorecard drill-down with cited prior art.
-- ✅ Full agent graph (research → inventor/adversarial loop → governor) is Gemini-backed and **live-validated**: real runs have produced coherent candidates, adversarial verdicts citing specific patents, and a complete `ScoreCard` with traceable evidence (needs a `GEMINI_API_KEY`; see `docs/roadmap.md` Days 7-11 for the recorded runs).
-- ✅ `POST /api/analyze` runs that graph as a background job — it returns `202` with a job id immediately, and `GET /api/analyze/{job_id}` is polled for status/result, so a multi-minute run never blocks the request or the frontend. Only one run is in flight at a time.
+- ✅ Patent landscape search + CPC-prefix clustering with a white-space score (density + recency + citation velocity + demand), exposed at `GET /api/landscape` — live on Cloud Run.
+- ✅ Frontend `OpportunityMap` renders that landscape live: search, expandable cluster cards, and candidate/scorecard drill-down with cited prior art.
+- ✅ Full agent graph (research → inventor/adversarial loop → governor) Gemini-backed and live-validated.
+- ✅ `POST /api/analyze` background job execution with `GET /api/analyze/{job_id}` polling.
 - ✅ CI (GitHub Actions) runs backend `pytest` and frontend `tsc`/`vite build`/`oxlint` on every push and PR.
-- ⏳ Cloud Run deployment — Dockerfile builds locally; not yet deployed (needs a GCP project, see `docs/deploy.md`).
+- ✅ Deployed live on Google Cloud Run (`us-central1`).
 
 ## Tech stack
 

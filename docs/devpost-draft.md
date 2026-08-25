@@ -107,5 +107,5 @@ npm run dev
 
 ## 9. Team & Links
 - **Code Repository**: [GitHub Repository](https://github.com/Abell-Systems/ip-matchmaker)
-- **Hosted App**: [Cloud Run Service URL]
+- **Hosted App**: [https://patent-agent-873418702379.us-central1.run.app](https://patent-agent-873418702379.us-central1.run.app)
 - **Demo Video**: [YouTube / Vimeo Link]
