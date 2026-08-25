@@ -1,47 +1,65 @@
 # Demo Video Script — IP Matchmaker
 
-**Duration:** ~4 minutes  
+**Duration:** ~4 minutes (Live / Unedited Action Flow)  
 **Track:** The Taskmaster (Devpost "All Things Agentic Hackathon")  
-**Core Story:** *"There is demand for a technology. Where is the white space, what could we build, and should we pursue it?"*
+**Locked Domain:** *"Solid-state electrolytes for EV batteries"*  
 
 ---
 
-## Script Breakdown
+## Timed Video Script (4:00 Total)
 
-### 0:00 – 0:30 | Problem Statement
-- **Visual:** Split screen or slide showing open innovation requests (Innoget) vs. massive, dense patent databases (Google Patents / BigQuery).
-- **Voiceover:**
-  > "Every year, R&D organizations publish thousands of open technology demands searching for solutions. At the same time, millions of patents saturate existing technical domains. Finding genuine innovation opportunities—where market pull meets true patent white space—is like finding a needle in a haystack. Current search tools return bare keyword lists, leaving researchers to manually decipher prior art risks."
-
-### 0:30 – 1:10 | Input & Market Demand Signal
-- **Visual:** Focus on an active technology call from the Innoget feed (e.g. *"PFAS-free Low-Friction Coating for metallic cutting edges"* or *"Solid-state electrolyte interface"*). Show how IP Matchmaker ingests open tech calls into structured `DemandSignal` objects.
-- **Voiceover:**
-  > "Meet IP Matchmaker: an autonomous Patent Innovation Agent built on Google ADK and Gemini 3.5. We start with real market-pull signals—here, an open technology call seeking low-friction, durable coatings. IP Matchmaker ingests these calls and queries Google Patents Public Datasets to map the entire competitive landscape."
-
-### 1:10 – 2:00 | OpportunityMap & White-Space Discovery
-- **Visual:** Screen recording of the React + Vite frontend (`OpportunityMap`). Show search execution (`coating`, `materials` or `solid electrolyte`, `EV batteries`). Expand cluster cards showing patent count, recency, citation velocity, Innoget demand signals, and the `white_space_score`.
-- **Voiceover:**
-  > "Our landscape engine groups patents by CPC technology prefix and computes a quantitative white-space score: combining patent density, recency, citation velocity, and market demand signals. In our OpportunityMap, clusters highlighted in green represent true white space—low patent saturation combined with strong industry demand."
-
-### 2:00 – 3:10 | Autonomous Agent Loop (Inventor $\rightarrow$ Adversarial)
-- **Visual:** Trigger `POST /api/analyze` on a white-space cluster. Display live status polling. Show `Inventor` agent output proposing candidate invention (`InventionCandidate`), followed by `Adversarial` agent's critique citing 4 exact prior-art publication numbers (`US-10448361-B2-17`), causing the `Inventor` agent to iterate.
-- **Voiceover:**
-  > "Once a white-space cluster is selected, IP Matchmaker launches an autonomous multi-agent graph. First, our **Inventor Agent** proposes a candidate invention targeting the gap. Next, our **Adversarial Agent** stress-tests the proposal against prior art. It actively attacks the candidate, citing specific patent publication numbers. If prior art overlaps, the Inventor agent refines the proposal automatically until it survives scrutiny."
-
-### 3:10 – 3:45 | Innovation Governor & Evidence Traceability
-- **Visual:** Show final `ScoreCard` rendered in the UI with sub-scores (Novelty: 0.92, Prior-Art Risk: 0.85, Differentiation: 0.88, Evidence: 0.95). Expand the "Explain Reasoning" toggle to show linked publication numbers in `supporting_evidence`.
-- **Voiceover:**
-  > "Finally, our **Innovation Governor Agent** evaluates surviving candidates, generating a comprehensive ScoreCard across novelty, risk, differentiation, and evidence. Crucially, every single score is backed by traceable patent publication numbers—not LLM hallucinations. Researchers can click any score to verify the exact prior art backing the decision."
-
-### 3:45 – 4:00 | Closing & Value Proposition
-- **Visual:** Overview of full flow (Innoget $\rightarrow$ Landscape $\rightarrow$ Agent Loop $\rightarrow$ ScoreCard) with Cloud Run / Google Cloud dashboard proof.
-- **Voiceover:**
-  > "IP Matchmaker connects market pull with patent landscape intelligence, turning evidence into actionable innovation decisions. Powered by Google ADK, Gemini 3.5, and Google Cloud, this is autonomous R&D intelligence at scale. Thank you!"
+```text
+0:00–0:30  Problema & Context
+0:30–1:00  Input & Problem Formulation
+1:00–1:40  Landscape Mining & White-Space Detection
+1:40–2:30  Agent Working (Research & Inventor Proposal)
+2:30–3:15  Adversarial Rejection & Inventor Iteration Loop
+3:15–3:40  Final Invention & Traceable Evidence ScoreCard
+3:40–4:00  Cloud Run & Google Cloud Live Infrastructure Proof
+```
 
 ---
 
-## Production Notes & Verification Checklist
+## Breakdown & Voiceover Guide
 
-- [ ] Record in 1080p, 60fps with clear audio.
-- [ ] Show Cloud Run backend URL (`.run.app`) or Google Cloud console dashboard visibly in the background to satisfy GCP usage judging criteria.
-- [ ] Keep agent loop section focused on *what changes* (candidate refinement + prior art citations), not internal framework code.
+### 0:00 – 0:30 | Problema (Problem Statement)
+- **Visual:** Split screen: Massive, dense patent database listings vs. R&D teams searching manually for freedom-to-operate white spaces.
+- **Voiceover:**
+  > "Finding genuine, patentable white-space opportunities is like finding a needle in a haystack. Traditional keyword search tools return thousands of dense patents, leaving researchers to manually guess prior-art risks."
+
+### 0:30 – 1:00 | Input (Domain Selection)
+- **Visual:** User inputs query *"solid-state electrolytes"* and domain *"EV batteries"* in the IP Matchmaker UI. Innoget market-demand signals load automatically.
+- **Voiceover:**
+  > "Meet IP Matchmaker: an autonomous R&D intelligence agent built on Google ADK, Gemini 3.5, and Google Cloud BigQuery. We start by specifying a technical domain—solid-state electrolytes for EV batteries—combining supply-side patents with live industry demand calls."
+
+### 1:00 – 1:40 | Landscape + White-Space
+- **Visual:** React OpportunityMap renders technology clusters. Hover over green cluster `c1` ("Solid Electrolytes - Sulfide & Oxide Interfaces") displaying high `white_space_score`.
+- **Voiceover:**
+  > "Our landscape engine mines Google Patents Public Datasets on BigQuery, groups patents by CPC classification, and calculates a quantitative white-space score combining density, recency, citation velocity, and market demand. Clusters highlighted in green reveal true innovation white spaces."
+
+### 1:40 – 2:30 | Agent Working
+- **Visual:** Clicking "Analyze White Space" triggers `POST /api/analyze`. Status changes to `running`. The **Inventor Agent** generates `InventionCandidate` (candidate_id: `c1-inv-1`).
+- **Voiceover:**
+  > "When a white space is selected, IP Matchmaker launches an autonomous multi-agent pipeline. Our **Inventor Agent** analyzes the cluster and proposes a novel candidate invention: a gradient sulfide-halide solid electrolyte interface to prevent dendrite growth."
+
+### 2:30 – 3:15 | Adversarial Rejection + Iteration
+- **Visual:** **Adversarial Agent** evaluates proposal, emits verdict `"rejected"`, citing prior art `US-10448361-B2`. **Inventor Agent** receives rejection and auto-iterates, creating refined candidate `c1-inv-2` with a fluorinated interphase. **Adversarial Agent** re-evaluates and emits `"survives"`.
+- **Voiceover:**
+  > "Next, our **Adversarial Agent** attacks the proposal against prior art. It finds an overlapping patent—US-10448361-B2—and rejects candidate 1 with detailed rationale. Rather than giving up, the Inventor Agent ingests the rejection, iterates, and proposes candidate 2 with a specialized fluorinated protective interphase. The Adversarial Agent re-tests and confirms it survives prior art scrutiny."
+
+### 3:15 – 3:40 | Final Invention + Evidence
+- **Visual:** Final `ScoreCard` renders with sub-scores: Novelty (0.92), Prior-Art Risk (0.85), Differentiation (0.88), Evidence (0.95). Expanding `supporting_evidence` shows clickable prior-art publication IDs.
+- **Voiceover:**
+  > "Finally, our **Innovation Governor Agent** evaluates the surviving candidate. It outputs a complete ScoreCard where every single score is backed by traceable patent publication numbers—providing concrete evidence, not LLM hallucinations."
+
+### 3:40 – 4:00 | Cloud Run / Google Cloud Proof
+- **Visual:** Browser showing live backend URL on Cloud Run (`https://patent-agent-...run.app/health`) and Google Cloud Console dashboard with active Cloud Run service logs.
+- **Voiceover:**
+  > "IP Matchmaker runs live on Google Cloud Run, leveraging Gemini 3.5 and BigQuery. This is autonomous innovation intelligence ready for production. Thank you!"
+
+---
+
+## Recording Golden Rules
+
+1. **Unedited Action:** Show actual agent responses and UI state transitions without skipping steps.
+2. **Cloud Run Visibility:** Keep Google Cloud Console / Cloud Run URL visible on screen at the 3:40 mark to fulfill GCP proof criteria.

@@ -57,9 +57,19 @@ app = get_fast_api_app(
 )
 
 
+app.router.routes = [r for r in app.router.routes if getattr(r, "path", None) != "/health"]
+
+
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "use_mock_bigquery": os.getenv("USE_MOCK_BIGQUERY", "true"),
+        "gemini_api_key_configured": bool(os.getenv("GEMINI_API_KEY")),
+        "model": os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
+    }
+
+
 
 
 @app.get("/api/landscape")
