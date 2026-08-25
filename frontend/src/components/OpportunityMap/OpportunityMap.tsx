@@ -57,12 +57,19 @@ export function OpportunityMap() {
     if (analysis[clusterId] === "loading") return;
     setAnalysis((prev) => ({ ...prev, [clusterId]: "loading" }));
     try {
-      const { job_id: jobId } = await startAnalyze(search.query, search.domain, clusterId);
+      const { job_id: jobId } = await startAnalyze(search.domain, search.query);
       // eslint-disable-next-line no-constant-condition
       while (true) {
         const result = await getAnalyzeStatus(jobId);
         if (result.status === "done") {
-          setAnalysis((prev) => ({ ...prev, [clusterId]: result }));
+          setAnalysis((prev) => ({
+            ...prev,
+            [clusterId]: {
+              candidates: result.candidates || [],
+              verdicts: result.verdicts || [],
+              scorecards: result.scorecards || [],
+            },
+          }));
           return;
         }
         if (result.status === "error") {

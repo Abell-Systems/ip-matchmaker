@@ -5,12 +5,15 @@
 import type {
   AdversarialVerdict,
   InventionCandidate,
+  JobStatusResponse,
   PatentCluster,
   PatentRecord,
+  PipelineStage,
   ScoreCard,
 } from "../types/patent";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+const API_BASE = API_BASE_URL;
 
 async function requestJson(url: string, init?: RequestInit): Promise<unknown> {
   const response = await fetch(url, init);
@@ -44,27 +47,31 @@ export interface AnalyzeResult {
   scorecards: ScoreCard[];
 }
 
-export type AnalyzeStatus =
-  | { status: "running" }
-  | ({ status: "done" } & AnalyzeResult)
-  | { status: "error"; detail: string };
+export type AnalyzeStatus = JobStatusResponse;
 
 // POST kicks off the agent graph in the background and returns a job id;
 // poll getAnalyzeStatus until status is "done" or "error".
 export async function startAnalyze(
-  query: string,
   domain: string,
-  clusterId: string,
-  signal?: AbortSignal,
-): Promise<{ job_id: string }> {
-  return (await requestJson(`${API_BASE_URL}/api/analyze`, {
+  query?: string,
+): Promise<{ job_id: string; status: string; stage: PipelineStage }> {
+  const res = await fetch(`${API_BASE}/api/analyze`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ query, domain, cluster_id: clusterId }),
-    signal,
-  })) as { job_id: string };
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ domain, query: query || "solid electrolyte interphase" }),
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({ detail: res.statusText }))) as { detail?: string };
+    throw new Error(err.detail || "Failed to start analysis");
+  }
+  return res.json() as Promise<{ job_id: string; status: string; stage: PipelineStage }>;
 }
 
-export async function getAnalyzeStatus(jobId: string, signal?: AbortSignal): Promise<AnalyzeStatus> {
-  return (await requestJson(`${API_BASE_URL}/api/analyze/${jobId}`, { signal })) as AnalyzeStatus;
+export async function getAnalyzeStatus(jobId: string): Promise<JobStatusResponse> {
+  const res = await fetch(`${API_BASE}/api/analyze/${jobId}`);
+  if (!res.ok) {
+    throw new Error(`Failed to check analysis status: ${res.statusText}`);
+  }
+  return res.json() as Promise<JobStatusResponse>;
 }
+

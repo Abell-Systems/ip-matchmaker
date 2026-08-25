@@ -63,3 +63,36 @@ export interface ScoreCard {
   supporting_evidence: string[];
   summary: string;
 }
+
+export type PipelineStage =
+  | "queued"
+  | "researching"
+  | "clustering"
+  | "inventing"
+  | "adversarial"
+  | "governor"
+  | "done"
+  | "error";
+
+export interface JobProgress {
+  patentsAnalyzed?: number;
+  clustersFound?: number;
+  candidatesGenerated?: number;
+  candidatesRejected?: number;
+  candidatesRevised?: number;
+  candidatesSurvived?: number;
+}
+
+export interface JobStatusResponse {
+  job_id?: string;
+  status: "running" | "done" | "error";
+  stage: PipelineStage;
+  progress?: JobProgress;
+  clusters?: PatentCluster[];
+  candidates?: InventionCandidate[];
+  verdicts?: AdversarialVerdict[];
+  scorecards?: ScoreCard[];
+  error?: string;
+  detail?: string;
+}
+

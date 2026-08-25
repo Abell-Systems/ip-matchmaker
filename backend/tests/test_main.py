@@ -98,7 +98,7 @@ def test_analyze_returns_202_with_job_id_and_completes(monkeypatch):
 
     import main
 
-    async def fake_execute(req):
+    async def fake_execute(job_id, req):
         await asyncio.sleep(0)
         return {"candidates": [], "verdicts": [], "scorecards": []}
 
@@ -132,7 +132,7 @@ def test_analyze_rejects_concurrent_runs(monkeypatch):
         domain = "d"
         cluster_id = "c"
 
-    async def slow_execute(req):
+    async def slow_execute(job_id, req):
         await gate.wait()
         return {"candidates": [], "verdicts": [], "scorecards": []}
 
@@ -142,3 +142,4 @@ def test_analyze_rejects_concurrent_runs(monkeypatch):
     second = client.post("/api/analyze", json={"query": "q", "domain": "d", "cluster_id": "c2"})
     assert second.status_code == 503
     gate.set()
+
