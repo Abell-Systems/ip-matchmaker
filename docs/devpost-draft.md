@@ -97,7 +97,15 @@ npm run dev
 
 ---
 
-## 8. Team & Links
+## 8. Infrastructure Cost & Resource Estimation
+> **Estimated demo infrastructure cost: $0.**
+> The prototype is designed to run within the applicable Google Cloud and Gemini free-tier quotas. Cloud Run provides a monthly free tier for low-volume workloads, and the demo's expected usage is substantially below those limits. Gemini usage is likewise intended to remain within the applicable free-tier quota. No paid infrastructure is required for the expected hackathon demonstration workload.
+>
+> A Google Cloud project and billing-enabled account may be required to deploy Cloud Run. Actual charges depend on current Google Cloud pricing, quotas, region, and account configuration.
+
+---
+
+## 9. Team & Links
 - **Code Repository**: [GitHub Repository](https://github.com/Abell-Systems/ip-matchmaker)
 - **Hosted App**: [Cloud Run Service URL]
 - **Demo Video**: [YouTube / Vimeo Link]

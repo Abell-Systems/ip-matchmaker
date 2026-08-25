@@ -49,9 +49,14 @@ npx vercel deploy --prod        # or: npx netlify-cli deploy --prod --dir=dist
 
 Then redeploy the backend with `FRONTEND_ORIGINS` set to the frontend URL (see step 1).
 
-## 3. Quota reality check
+## 3. Quota & Cost Reality Check
 
-Free tier: **5 req/min and 20 req/day per model.** One full graph run ≈ 20 calls,
+> **Estimated demo infrastructure cost: $0.**
+> The prototype is designed to run within the applicable Google Cloud and Gemini free-tier quotas. Cloud Run provides a monthly free tier for low-volume workloads, and the demo's expected usage is substantially below those limits. Gemini usage is likewise intended to remain within the applicable free-tier quota. No paid infrastructure is required for the expected hackathon demonstration workload.
+>
+> A Google Cloud project and billing-enabled account may be required to deploy Cloud Run. Actual charges depend on current Google Cloud pricing, quotas, region, and account configuration.
+
+Free tier quota: **5 req/min and 20 req/day per model.** One full graph run ≈ 20 calls,
 so each User Zero gets roughly one pipeline run per day. Mitigations:
 
 - Set `GEMINI_MODEL=gemini-3.5-flash-lite` in Cloud Run env vars for validation runs
