@@ -33,3 +33,14 @@ def test_innoget_demand_source_match_provenance():
     assert isinstance(provenance, MatchProvenance)
     assert provenance.score > 0
     assert len(provenance.matched_fields) > 0
+
+
+def test_innoget_demand_source_searches_text_field():
+    ds = InnogetDemandDataSource()
+    # Search for terms present in the body text of Innoget calls
+    results = ds.search_demand_with_provenance(query="depuration decontamination", domain="marine", max_results=5)
+
+    assert len(results) > 0
+    signal, provenance = results[0]
+    assert "text" in provenance.matched_fields
+

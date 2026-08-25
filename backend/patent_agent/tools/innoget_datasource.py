@@ -79,6 +79,9 @@ class InnogetDemandDataSource:
                 if term in field_texts["description"]:
                     score += 1.0
                     matched_fields.append("description")
+                if term in field_texts["text"]:
+                    score += 0.5
+                    matched_fields.append("text")
 
             if score > 0 or not search_terms:
                 unique_matched = sorted(list(set(matched_fields)))

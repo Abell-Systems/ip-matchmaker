@@ -88,15 +88,4 @@ def map_cpc_prefix(text_fields: list[str]) -> str | None:
     if len(matches) == 1:
         return matches[0]
 
-    # If multiple matched, pick the primary if one dominates or return None on ambiguity
-    if len(matches) > 1:
-        # e.g., if H01M is present with C08L, H01M takes precedence for battery materials
-        if "H01M" in matches:
-            return "H01M"
-        if "A23L" in matches and "A61K" not in matches:
-            return "A23L"
-        if "A61K" in matches:
-            return "A61K"
-        return matches[0]
-
     return None

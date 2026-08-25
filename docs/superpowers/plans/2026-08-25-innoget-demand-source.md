@@ -23,7 +23,7 @@
 - Create: `backend/patent_agent/tools/innoget_demands.json`
 
 **Interfaces:**
-- Produces: JSON dataset containing 77 Innoget technology call records.
+- Produces: JSON dataset containing 19 complete Innoget technology call records.
 
 - [ ] **Step 1: Write `backend/patent_agent/tools/innoget_demands.json`**
 

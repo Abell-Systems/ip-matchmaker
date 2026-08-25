@@ -76,7 +76,7 @@ The integration aligns with the existing architecture:
 
 ### 4.1 JSON Fixture Store
 - **File**: `backend/patent_agent/tools/innoget_demands.json`
-- Stores the 77 Innoget technology call records provided in the dataset.
+- Stores the 19 complete Innoget technology call records parsed from the input dataset.
 
 ### 4.2 Deterministic CPC Mapper (`backend/patent_agent/tools/cpc_mapper.py`)
 - Standardizes keyword and category matching to CPC prefixes:

@@ -20,3 +20,9 @@ def test_cpc_mapper_a61k_pharma_bio():
 def test_cpc_mapper_ambiguous_returns_none():
     assert map_cpc_prefix(["kitchen sink centerpiece marketing campaign", "student challenge"]) is None
     assert map_cpc_prefix(["unclear general requirement"]) is None
+
+
+def test_cpc_mapper_multiple_matches_returns_none():
+    # Contains both battery (H01M) and food (A23L) keywords -> ambiguous, must return None
+    assert map_cpc_prefix(["battery storage for frozen food logistics"]) is None
+
