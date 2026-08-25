@@ -80,7 +80,8 @@ heuristic (`white_space_score = 0.4·(1-density) + 0.2·recency + 0.15·citation
 calls the patents/demand data sources + `cluster_patents` directly, bypassing the ADK
 Runner/Gemini — it works with zero external credentials. `POST /api/analyze` runs the
 full agent graph for one cluster (requires GEMINI_API_KEY); both endpoints are used by
-the frontend's OpportunityMap component.
+the frontend's OpportunityMap component. Demand data source selection is controlled by
+`DEMAND_SOURCE` (`mock` | `innoget`).
 
 ### Mock/real data swap
 
