@@ -1,13 +1,30 @@
-import type { JobProgress, PipelineStage } from "../../types/patent";
+import type {
+  AdversarialVerdict,
+  AgentEventItem,
+  InventionCandidate,
+  JobProgress,
+  PipelineStage,
+} from "../../types/patent";
+import { AgentActivityFeed } from "./AgentActivityFeed";
 import styles from "./ExecutionView.module.css";
 
 interface ExecutionViewProps {
   domain: string;
   stage: PipelineStage;
   progress?: JobProgress;
+  events?: AgentEventItem[];
+  verdicts?: AdversarialVerdict[];
+  candidates?: InventionCandidate[];
 }
 
-export function ExecutionView({ domain, stage, progress }: ExecutionViewProps) {
+export function ExecutionView({
+  domain,
+  stage,
+  progress,
+  events = [],
+  verdicts = [],
+  candidates = [],
+}: ExecutionViewProps) {
   const stagesList = [
     {
       id: "researching",
@@ -57,6 +74,10 @@ export function ExecutionView({ domain, stage, progress }: ExecutionViewProps) {
         <h2 className={styles.domainTitle}>{domain}</h2>
       </header>
 
+      <div className={styles.notice}>
+        <p>The agent is trying to disprove its own inventions before recommending them.</p>
+      </div>
+
       <div className={styles.pipeline}>
         {stagesList.map((st) => {
           const stIdx = stageOrder.indexOf(st.id as PipelineStage);
@@ -81,9 +102,75 @@ export function ExecutionView({ domain, stage, progress }: ExecutionViewProps) {
         })}
       </div>
 
-      <footer className={styles.notice}>
-        <p>The agent is working autonomously.</p>
-      </footer>
+      {/* Task 3 — Self-Adversarial Loop Visualization */}
+      {(verdicts.length > 0 || stage === "adversarial" || stage === "governor" || stage === "done") && (
+        <div className={styles.adversarialBox}>
+          <div className={styles.adversarialHeader}>
+            <h3 className={styles.adversarialTitle}>INVENTION VALIDATION</h3>
+            {candidates.length > 0 && (
+              <span style={{ fontSize: "0.85rem", color: "#a5b4fc", fontWeight: 600 }}>
+                Candidate #{candidates[0].candidate_id}: {candidates[0].title}
+              </span>
+            )}
+            <div className={styles.killBanner}>
+              ⚔ The agent is trying to kill its own invention.
+            </div>
+          </div>
+
+          <div className={styles.attackFlow}>
+            {verdicts.length === 0 ? (
+              <div className={styles.attackStep}>
+                <div className={styles.attackHeader}>
+                  <span className={styles.attackTitle}>Attack #1</span>
+                  <span className={styles.attackStatusRejected}>In progress...</span>
+                </div>
+                <div className={styles.attackDetail}>Evaluating claims against patent landscape prior art.</div>
+              </div>
+            ) : (
+              verdicts.map((v, idx) => {
+                const vStr = (v.verdict || "").toLowerCase();
+                const isRejected = vStr === "rejected";
+                const isRevised = vStr === "revised" || vStr === "revise";
+
+                let statusText = `✓ Survived`;
+                let statusClass = styles.attackStatusSurvived;
+
+                if (isRejected) {
+                  statusText = `❌ Rejected`;
+                  statusClass = styles.attackStatusRejected;
+                } else if (isRevised) {
+                  statusText = `↻ Revised`;
+                  statusClass = styles.attackStatusRevised;
+                }
+
+                return (
+                  <div key={`${v.candidate_id}-${idx}`}>
+                    {idx > 0 && <div className={styles.arrowDown}>↓</div>}
+                    <div className={styles.attackStep}>
+                      <div className={styles.attackHeader}>
+                        <span className={styles.attackTitle}>
+                          Attack #{idx + 1} (Candidate #{v.candidate_id})
+                        </span>
+                        <span className={statusClass}>{statusText}</span>
+                      </div>
+                      {v.cited_patents && v.cited_patents.length > 0 && (
+                        <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+                          Prior art: {v.cited_patents.join(", ")}
+                        </div>
+                      )}
+                      {v.rationale && <div className={styles.attackDetail}>{v.rationale}</div>}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Task 2 — Activity Feed */}
+      <AgentActivityFeed events={events} isLive={stage !== "done" && stage !== "error"} />
     </div>
   );
 }
+

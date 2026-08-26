@@ -106,6 +106,9 @@ export function App() {
         domain={domain}
         stage={jobStatus?.stage || "queued"}
         progress={jobStatus?.progress}
+        events={jobStatus?.events}
+        verdicts={jobStatus?.verdicts}
+        candidates={jobStatus?.candidates}
       />
     );
   }

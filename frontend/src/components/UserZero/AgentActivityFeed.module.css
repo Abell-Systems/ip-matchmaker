@@ -1,0 +1,140 @@
+.container {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 1.25rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.875rem;
+  color: #e2e8f0;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  margin-top: 1rem;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #1e293b;
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.liveIndicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #10b981;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  background-color: #10b981;
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.4;
+  }
+}
+
+.feedList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.feedItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  line-height: 1.4;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.iconDefault {
+  background: #1e293b;
+  color: #38bdf8;
+}
+
+.iconChallenge {
+  background: #312e81;
+  color: #818cf8;
+}
+
+.iconRejected {
+  background: #450a0a;
+  color: #f87171;
+}
+
+.iconRevised {
+  background: #365314;
+  color: #a3e635;
+}
+
+.iconSurvived {
+  background: #064e3b;
+  color: #34d399;
+}
+
+.content {
+  flex: 1;
+}
+
+.message {
+  color: #f1f5f9;
+  font-weight: 500;
+}
+
+.subDetail {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: #94a3b8;
+  background: #1e293b;
+  padding: 0.35rem 0.6rem;
+  border-radius: 4px;
+}
+
+.timestamp {
+  font-size: 0.7rem;
+  color: #64748b;
+  margin-top: 0.15rem;
+}
+
+.emptyState {
+  color: #64748b;
+  font-style: italic;
+  padding: 1rem 0;
+  text-align: center;
+}

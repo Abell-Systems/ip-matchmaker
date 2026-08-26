@@ -87,3 +87,14 @@ class ScoreCardList(BaseModel):
     """Governor output_schema wrapper: ADK structured output needs a single model."""
 
     scorecards: list[ScoreCard] = Field(min_length=1)
+
+
+class AgentEventItem(BaseModel):
+    """An observable event emitted during agent pipeline execution."""
+
+    type: str
+    timestamp: str
+    message: str
+    candidateId: str | None = None
+    evidence: dict | list | str | None = None
+

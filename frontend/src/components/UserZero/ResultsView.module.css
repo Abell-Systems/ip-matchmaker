@@ -315,6 +315,26 @@
   }
 }
 
+.rejectedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  background: rgba(239, 68, 68, 0.18);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  .rejectedBadge {
+    color: #f87171;
+    background: rgba(239, 68, 68, 0.22);
+  }
+}
+
 .differentiationText {
   margin: 0;
   font-size: 0.95rem;

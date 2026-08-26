@@ -14,6 +14,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from datetime import datetime, timezone
+
 from fastapi import HTTPException, Query  # noqa: E402
 from google.adk.cli.fast_api import get_fast_api_app  # noqa: E402
 from google.adk.runners import Runner  # noqa: E402
@@ -32,6 +34,7 @@ from patent_agent.tools.clustering import cluster_patents  # noqa: E402
 from patent_agent.tools.demand_sources import get_demand_datasource  # noqa: E402
 from patent_agent.tools.schemas import (  # noqa: E402
     AdversarialVerdict,
+    AgentEventItem,
     InventionCandidate,
     PatentRecord,
     ScoreCard,
@@ -154,19 +157,79 @@ _ANALYZE_TIMEOUT_S = int(os.getenv("ANALYZE_TIMEOUT_SECONDS", "900"))
 _jobs: dict[str, dict] = {}
 
 
+def _emit_event(
+    job_id: str,
+    event_type: str,
+    message: str,
+    candidate_id: str | None = None,
+    evidence: dict | list | str | None = None,
+) -> None:
+    if "events" not in _jobs.get(job_id, {}):
+        if job_id in _jobs:
+            _jobs[job_id]["events"] = []
+        else:
+            return
+    ts = datetime.now(timezone.utc).isoformat()
+    evt = {
+        "type": event_type,
+        "timestamp": ts,
+        "message": message,
+    }
+    if candidate_id:
+        evt["candidateId"] = candidate_id
+    if evidence is not None:
+        evt["evidence"] = evidence
+    _jobs[job_id]["events"].append(evt)
+
+
+def reconcile_candidate_verdicts(
+    verdicts: list[dict], scorecards: list[dict]
+) -> list[dict]:
+    """Ensures backend produces authoritative verdict: if governor scorecard finds
+    direct anticipation or blocking prior art, force verdict to 'rejected'."""
+    reconciled = []
+    for v in verdicts:
+        v_copy = dict(v)
+        cand_id = v_copy.get("candidate_id")
+        sc = next((s for s in scorecards if isinstance(s, dict) and s.get("candidate_id") == cand_id), None)
+        if sc:
+            summary = (sc.get("summary") or "").lower()
+            if (
+                "directly anticipated" in summary
+                or "no room for novelty" in summary
+                or "cannot be recommended" in summary
+            ):
+                v_copy["verdict"] = "rejected"
+        reconciled.append(v_copy)
+    return reconciled
+
+
 async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
     """Runs the agent graph for one cluster; returns candidates/verdicts/scorecards."""
     _jobs[job_id]["stage"] = "researching"
     _jobs[job_id]["progress"] = {}
+    _jobs[job_id]["events"] = []
     
     records = get_patents_datasource().search_patents(req.query, req.domain, max_results=20)
     demand_signals = get_demand_datasource().search_demand(req.query, req.domain)
     _jobs[job_id]["progress"]["patentsAnalyzed"] = len(records)
+    _emit_event(
+        job_id,
+        "research_completed",
+        f"Researched {len(records)} patents",
+        evidence={"patentsAnalyzed": len(records)},
+    )
     
     _jobs[job_id]["stage"] = "clustering"
     clusters = cluster_patents(records, demand_signals)
     _jobs[job_id]["progress"]["clustersFound"] = len(clusters)
     _jobs[job_id]["clusters"] = [c.model_dump() for c in clusters]
+    _emit_event(
+        job_id,
+        "landscape_clustered",
+        f"Found {len(clusters)} white-space opportunities",
+        evidence={"clustersFound": len(clusters)},
+    )
     
     cluster_id = req.cluster_id or (clusters[0].cluster_id if clusters else "unknown")
     
@@ -180,7 +243,12 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
     )
     msg = types.Content(role="user", parts=[types.Part(text=prompt)])
 
+    seen_candidates: set[str] = set()
+    seen_verdict_indices: set[int] = set()
+    seen_assessment = False
+
     async def run() -> None:
+        nonlocal seen_assessment
         async for _ in _runner.run_async(user_id="web", session_id=session.id, new_message=msg):
             curr = await _session_service.get_session(
                 app_name="ip_matchmaker", user_id="web", session_id=session.id
@@ -190,6 +258,27 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
             cands = _as_list(state.get(CANDIDATE_INVENTIONS))
             if cands:
                 _jobs[job_id]["progress"]["candidatesGenerated"] = len(cands)
+                for cand in cands:
+                    cand_id = "unknown"
+                    cand_title = ""
+                    if isinstance(cand, dict):
+                        cand_id = str(cand.get("candidate_id", "unknown"))
+                        cand_title = cand.get("title", "")
+                    elif hasattr(cand, "candidate_id"):
+                        cand_id = str(getattr(cand, "candidate_id"))
+                        cand_title = getattr(cand, "title", "")
+                    else:
+                        cand_id = str(cand)
+
+                    if cand_id not in seen_candidates:
+                        seen_candidates.add(cand_id)
+                        _emit_event(
+                            job_id,
+                            "candidate_generated",
+                            f"Generated Candidate #{cand_id}" + (f": {cand_title}" if cand_title else ""),
+                            candidate_id=cand_id,
+                            evidence=cand if isinstance(cand, (dict, list, str, int, float)) else str(cand),
+                        )
                 
             verdicts = _as_list(state.get(ADVERSARIAL_VERDICTS))
             if verdicts:
@@ -197,15 +286,54 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
                 rej = 0
                 surv = 0
                 rev = 0
-                for v in verdicts:
+                for idx, v in enumerate(verdicts):
                     if isinstance(v, dict):
                         v_str = str(v.get("verdict", "")).lower()
                         if v_str == "rejected":
                             rej += 1
                         elif v_str == "survives":
                             surv += 1
-                        elif v_str == "revised" or v_str == "revise":
+                        elif v_str in ("revised", "revise"):
                             rev += 1
+
+                        if idx not in seen_verdict_indices:
+                            seen_verdict_indices.add(idx)
+                            v_cand_id = str(v.get("candidate_id", "unknown"))
+                            cited = v.get("cited_patents", [])
+                            cited_str = f"Prior art: {', '.join(cited)}" if cited else ""
+                            
+                            _emit_event(
+                                job_id,
+                                "candidate_challenged",
+                                f"Candidate #{v_cand_id} challenged" + (f" ({cited_str})" if cited_str else ""),
+                                candidate_id=v_cand_id,
+                                evidence=v,
+                            )
+                            if v_str == "rejected":
+                                _emit_event(
+                                    job_id,
+                                    "candidate_rejected",
+                                    f"Candidate #{v_cand_id} rejected",
+                                    candidate_id=v_cand_id,
+                                    evidence=v,
+                                )
+                            elif v_str in ("revised", "revise"):
+                                _emit_event(
+                                    job_id,
+                                    "candidate_revised",
+                                    f"Candidate #{v_cand_id} revised",
+                                    candidate_id=v_cand_id,
+                                    evidence=v,
+                                )
+                            elif v_str == "survives":
+                                _emit_event(
+                                    job_id,
+                                    "candidate_survived",
+                                    f"Candidate #{v_cand_id} survived",
+                                    candidate_id=v_cand_id,
+                                    evidence=v,
+                                )
+
                 _jobs[job_id]["progress"]["candidatesRejected"] = rej
                 _jobs[job_id]["progress"]["candidatesRevised"] = rev
                 _jobs[job_id]["progress"]["candidatesSurvived"] = surv
@@ -213,6 +341,14 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
             scores = _as_list(state.get(SCORED_CANDIDATES))
             if scores:
                 _jobs[job_id]["stage"] = "governor"
+                if not seen_assessment:
+                    seen_assessment = True
+                    _emit_event(
+                        job_id,
+                        "assessment_completed",
+                        "Final assessment complete",
+                        evidence={"scorecardsCount": len(scores)},
+                    )
 
     try:
         await run()
@@ -220,10 +356,13 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
             app_name="ip_matchmaker", user_id="web", session_id=session.id
         )
         final_state = final.state or {}
+        raw_verdicts = _validated(AdversarialVerdict, final_state.get(ADVERSARIAL_VERDICTS))
+        raw_scorecards = _validated(ScoreCard, final_state.get(SCORED_CANDIDATES))
         return {
             "candidates": _validated(InventionCandidate, final_state.get(CANDIDATE_INVENTIONS)),
-            "verdicts": _validated(AdversarialVerdict, final_state.get(ADVERSARIAL_VERDICTS)),
-            "scorecards": _validated(ScoreCard, final_state.get(SCORED_CANDIDATES)),
+            "verdicts": reconcile_candidate_verdicts(raw_verdicts, raw_scorecards),
+            "scorecards": raw_scorecards,
+            "events": _jobs[job_id].get("events", []),
         }
     finally:
         await _session_service.delete_session(
@@ -235,16 +374,28 @@ async def _run_job(job_id: str, req: AnalyzeRequest) -> None:
     async with _analyze_lock:
         try:
             result = await asyncio.wait_for(_execute_analysis(job_id, req), timeout=_ANALYZE_TIMEOUT_S)
-            _jobs[job_id] = {"status": "done", "stage": "done", **result}
+            _jobs[job_id] = {
+                "status": "done",
+                "stage": "done",
+                "events": _jobs[job_id].get("events", []),
+                **result,
+            }
         except TimeoutError:
             _jobs[job_id] = {
                 "status": "error",
                 "stage": "error",
+                "events": _jobs[job_id].get("events", []),
                 "detail": f"Agent run exceeded {_ANALYZE_TIMEOUT_S}s.",
             }
         except Exception as exc:
             logger.exception("analyze job %s failed", job_id)
-            _jobs[job_id] = {"status": "error", "stage": "error", "detail": str(exc)[:300]}
+            _jobs[job_id] = {
+                "status": "error",
+                "stage": "error",
+                "events": _jobs[job_id].get("events", []),
+                "detail": str(exc)[:300],
+            }
+
 
 
 @app.post("/api/analyze", status_code=202)
@@ -260,6 +411,10 @@ async def analyze(req: AnalyzeRequest) -> dict:
     return {"job_id": job_id, "status": "running", "stage": "queued"}
 
 
+from fastapi.responses import FileResponse  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+
+
 @app.get("/api/analyze/{job_id}")
 async def analyze_status(job_id: str) -> dict:
     """Poll endpoint for a background analyze run."""
@@ -269,7 +424,52 @@ async def analyze_status(job_id: str) -> dict:
     return job
 
 
+def _get_dist_dir() -> str | None:
+    static_dir = os.path.join(AGENTS_DIR, "static")
+    if os.path.exists(static_dir):
+        return static_dir
+    dist_dir = os.path.abspath(os.path.join(AGENTS_DIR, "../frontend/dist"))
+    if os.path.exists(dist_dir):
+        return dist_dir
+    return None
+
+
+_initial_dist = _get_dist_dir()
+if _initial_dist and os.path.exists(os.path.join(_initial_dist, "assets")):
+    app.mount("/assets", StaticFiles(directory=os.path.join(_initial_dist, "assets")), name="assets")
+
+
+@app.get("/")
+async def serve_root():
+    dist_dir = _get_dist_dir()
+    if dist_dir:
+        index_file = os.path.join(dist_dir, "index.html")
+        if os.path.isfile(index_file):
+            return FileResponse(index_file)
+    raise HTTPException(
+        status_code=404,
+        detail="Frontend static build not found. Run 'npm run build' inside frontend/ directory.",
+    )
+
+
+@app.get("/{full_path:path}")
+async def serve_frontend(full_path: str):
+    if full_path.startswith("api/") or full_path.startswith("health"):
+        raise HTTPException(status_code=404, detail="API route not found.")
+    dist_dir = _get_dist_dir()
+    if dist_dir:
+        target_file = os.path.join(dist_dir, full_path)
+        if os.path.isfile(target_file):
+            return FileResponse(target_file)
+        index_file = os.path.join(dist_dir, "index.html")
+        if os.path.isfile(index_file):
+            return FileResponse(index_file)
+    raise HTTPException(status_code=404, detail="Frontend route not found.")
+
+
 if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8080")))
+
+

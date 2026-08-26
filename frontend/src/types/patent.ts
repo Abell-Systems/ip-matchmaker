@@ -74,6 +74,24 @@ export type PipelineStage =
   | "done"
   | "error";
 
+export type AgentEventType =
+  | "research_completed"
+  | "landscape_clustered"
+  | "candidate_generated"
+  | "candidate_challenged"
+  | "candidate_rejected"
+  | "candidate_revised"
+  | "candidate_survived"
+  | "assessment_completed";
+
+export interface AgentEventItem {
+  type: AgentEventType | string;
+  timestamp: string;
+  message: string;
+  candidateId?: string;
+  evidence?: unknown;
+}
+
 export interface JobProgress {
   patentsAnalyzed?: number;
   clustersFound?: number;
@@ -88,6 +106,7 @@ export interface JobStatusResponse {
   status: "running" | "done" | "error";
   stage: PipelineStage;
   progress?: JobProgress;
+  events?: AgentEventItem[];
   clusters?: PatentCluster[];
   candidates?: InventionCandidate[];
   verdicts?: AdversarialVerdict[];
@@ -95,4 +114,5 @@ export interface JobStatusResponse {
   error?: string;
   detail?: string;
 }
+
 

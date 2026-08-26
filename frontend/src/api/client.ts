@@ -12,7 +12,7 @@ import type {
   ScoreCard,
 } from "../types/patent";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 const API_BASE = API_BASE_URL;
 
 async function requestJson(url: string, init?: RequestInit): Promise<unknown> {

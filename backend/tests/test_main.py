@@ -143,3 +143,13 @@ def test_analyze_rejects_concurrent_runs(monkeypatch):
     assert second.status_code == 503
     gate.set()
 
+
+def test_frontend_root_and_static_assets_serve_200():
+    res_root = client.get("/")
+    assert res_root.status_code == 200
+    assert "<!doctype html>" in res_root.text.lower()
+
+    res_index = client.get("/index.html")
+    assert res_index.status_code == 200
+
+

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { JobStatusResponse } from "../../types/patent";
+import type { AdversarialVerdict, JobStatusResponse, ScoreCard } from "../../types/patent";
 import { CausalChain } from "./CausalChain";
 import styles from "./ResultsView.module.css";
 
@@ -28,10 +28,29 @@ export function ResultsView({ domain, result, onReset }: ResultsViewProps) {
   const scorecards = result.scorecards || [];
   const clusters = result.clusters || [];
 
+  function isCandidateSurvived(
+    verdict?: AdversarialVerdict,
+    scorecard?: ScoreCard
+  ): boolean {
+    if (!verdict) return false;
+    const vStr = (verdict.verdict || "").toLowerCase();
+    if (vStr !== "survives") return false;
+    const summary = (scorecard?.summary || "").toLowerCase();
+    if (
+      summary.includes("directly anticipated") ||
+      summary.includes("no room for novelty") ||
+      summary.includes("cannot be recommended")
+    ) {
+      return false;
+    }
+    return true;
+  }
+
   // Filter candidates prioritizing surviving ones
   const survivingCandidates = candidates.filter((c) => {
     const v = verdicts.find((verdict) => verdict.candidate_id === c.candidate_id);
-    return v ? v.verdict === "survives" : true;
+    const sc = scorecards.find((scorecard) => scorecard.candidate_id === c.candidate_id);
+    return isCandidateSurvived(v, sc);
   });
 
   const displayCandidates = survivingCandidates.length > 0 ? survivingCandidates : candidates;
@@ -54,6 +73,23 @@ export function ResultsView({ domain, result, onReset }: ResultsViewProps) {
 
   const currentScorecard = scorecards.find(
     (sc) => sc.candidate_id === currentCandidate?.candidate_id
+  );
+
+  const isSurvived = isCandidateSurvived(currentVerdict, currentScorecard);
+
+  // Consolidate challenging patents across verdict cited_patents and scorecard supporting_evidence
+  const citedPatentsFromVerdict = currentVerdict?.cited_patents || [];
+  const supportingEvidenceFromScorecard = currentScorecard?.supporting_evidence || [];
+
+  const extractedPatentsFromEvidence = supportingEvidenceFromScorecard
+    .map((item) => {
+      const match = item.match(/\b(US-[A-Za-z0-9-]+)\b/);
+      return match ? match[1] : item.trim();
+    })
+    .filter((item) => item.length > 0 && item.startsWith("US-"));
+
+  const effectiveChallengingPatents = Array.from(
+    new Set([...citedPatentsFromVerdict, ...extractedPatentsFromEvidence])
   );
 
   if (!currentCandidate) {
@@ -81,19 +117,32 @@ export function ResultsView({ domain, result, onReset }: ResultsViewProps) {
   const priorArtRiskVal = currentScorecard?.prior_art_risk;
   const isLowRisk = priorArtRiskVal !== undefined && (priorArtRiskVal <= 0.35 || (priorArtRiskVal <= 35 && priorArtRiskVal > 1));
 
+  const hasValidWhiteSpaceScore =
+    currentCluster?.white_space_score !== undefined &&
+    currentCluster?.white_space_score !== null &&
+    !Number.isNaN(currentCluster.white_space_score);
+
   return (
     <div className={styles.container}>
       <header className={styles.header}>
         {domain && <div className={styles.domainBadge}>{domain}</div>}
-        <h1 className={styles.title}>Top Surviving Invention Opportunity</h1>
+        <h1 className={styles.title}>
+          {isSurvived
+            ? "Top Surviving Invention Opportunity"
+            : "Analysis Complete — Candidate Invention Rejected"}
+        </h1>
         <p className={styles.subtitle}>
-          The agent discovered white-space, generated candidate claims, attacked them with adversarial prior-art citations, and verified survival.
+          {isSurvived
+            ? "The agent discovered white-space, generated candidate claims, attacked them with adversarial prior-art citations, and verified survival."
+            : "The agent generated candidate claims, performed an adversarial invalidation challenge, and identified blocking prior art that anticipates the invention."}
         </p>
       </header>
 
       {displayCandidates.length > 1 && (
         <div className={styles.candidateSelector}>
-          <span className={styles.selectorLabel}>Surviving candidates:</span>
+          <span className={styles.selectorLabel}>
+            {survivingCandidates.length > 0 ? "Surviving candidates:" : "Evaluated candidates:"}
+          </span>
           <div className={styles.candidatePills}>
             {displayCandidates.map((cand, idx) => (
               <button
@@ -145,10 +194,12 @@ export function ResultsView({ domain, result, onReset }: ResultsViewProps) {
             <div className={styles.opportunityRow}>
               <div className={styles.opportunityInfo}>
                 <span className={styles.opportunityLabel}>
-                  {currentCluster?.label || "Target White-Space Cluster"}
+                  {currentCluster?.label || "Target Cluster"}
                 </span>
                 <p className={styles.opportunityDesc}>
-                  Under-served white-space area in the surveyed patent landscape with low prior-art saturation and unaddressed demand signals.
+                  {hasValidWhiteSpaceScore
+                    ? "Under-served white-space area in the surveyed patent landscape with low prior-art saturation and unaddressed demand signals."
+                    : "Technology cluster analyzed in surveyed landscape; white-space metrics unavailable for this calculation."}
                 </p>
               </div>
               <div className={styles.scoreBadgeBox}>
@@ -171,9 +222,9 @@ export function ResultsView({ domain, result, onReset }: ResultsViewProps) {
             <p className={styles.challengeIntro}>
               The adversarial examiner challenged the candidate against closest prior-art citations:
             </p>
-            {currentVerdict?.cited_patents && currentVerdict.cited_patents.length > 0 ? (
+            {effectiveChallengingPatents.length > 0 ? (
               <div className={styles.patentList}>
-                {currentVerdict.cited_patents.map((pat) => (
+                {effectiveChallengingPatents.map((pat) => (
                   <a
                     key={pat}
                     href={getPatentUrl(pat)}
@@ -188,7 +239,7 @@ export function ResultsView({ domain, result, onReset }: ResultsViewProps) {
                 ))}
               </div>
             ) : (
-              <p className={styles.emptyNote}>No blocking patent references found in landscape.</p>
+              <p className={styles.emptyNote}>Evidence unavailable for this step.</p>
             )}
             {currentVerdict?.rationale && (
               <div className={styles.quoteBox}>
@@ -199,19 +250,31 @@ export function ResultsView({ domain, result, onReset }: ResultsViewProps) {
           </div>
         </div>
 
-        {/* 4. Why did it survive? */}
+        {/* 4. Why did it survive? / Evaluation Outcome */}
         <div className={styles.sectionBlock}>
           <div className={styles.questionHeader}>
             <span className={styles.questionNumber}>4</span>
-            <h3 className={styles.questionTitle}>Why did it survive?</h3>
+            <h3 className={styles.questionTitle}>
+              {isSurvived ? "Why did it survive?" : "Evaluation Outcome"}
+            </h3>
           </div>
           <div className={styles.answerContent}>
             <div className={styles.survivalStatusRow}>
-              <span className={styles.survivesBadge}>✓ Survives Prior-Art Challenge</span>
+              {isSurvived ? (
+                <span className={styles.survivesBadge}>✓ Survived Adversarial Review</span>
+              ) : (
+                <span className={styles.rejectedBadge}>
+                  ❌ Rejected — Did Not Survive Adversarial Review
+                </span>
+              )}
             </div>
             <p className={styles.differentiationText}>
-              {currentCandidate.claimed_novelty ||
-                "Clear functional differentiation from cited prior art establishes strong novelty and freedom-to-operate potential."}
+              {isSurvived
+                ? currentCandidate.claimed_novelty ||
+                  "Clear functional differentiation from cited prior art establishes strong novelty and freedom-to-operate potential."
+                : currentScorecard?.summary ||
+                  currentVerdict?.rationale ||
+                  "The proposed invention was directly anticipated by pre-existing patents in the landscape, preventing patentability recommendation."}
             </p>
           </div>
         </div>

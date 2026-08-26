@@ -39,15 +39,55 @@ interface ChainNodeDef {
   shortSummary: string;
 }
 
+function isCandidateSurvived(
+  verdict?: AdversarialVerdict,
+  scorecard?: ScoreCard
+): boolean {
+  if (!verdict) return false;
+  const vStr = (verdict.verdict || "").toLowerCase();
+  if (vStr !== "survives") return false;
+  const summary = (scorecard?.summary || "").toLowerCase();
+  if (
+    summary.includes("directly anticipated") ||
+    summary.includes("no room for novelty") ||
+    summary.includes("cannot be recommended")
+  ) {
+    return false;
+  }
+  return true;
+}
+
 export function CausalChain({ cluster, candidate, verdict, scorecard }: CausalChainProps) {
   const [activeNode, setActiveNode] = useState<NodeId | "ALL">("OPPORTUNITY");
+
+  const isSurvived = isCandidateSurvived(verdict, scorecard);
+
+  // Consolidate challenging patents across verdict cited_patents and scorecard supporting_evidence
+  const citedPatentsFromVerdict = verdict?.cited_patents || [];
+  const supportingEvidenceFromScorecard = scorecard?.supporting_evidence || [];
+
+  const extractedPatentsFromEvidence = supportingEvidenceFromScorecard
+    .map((item) => {
+      const match = item.match(/\b(US-[A-Za-z0-9-]+)\b/);
+      return match ? match[1] : item.trim();
+    })
+    .filter((item) => item.length > 0 && item.startsWith("US-"));
+
+  const effectiveChallengingPatents = Array.from(
+    new Set([...citedPatentsFromVerdict, ...extractedPatentsFromEvidence])
+  );
+
+  const hasValidWhiteSpaceScore =
+    cluster?.white_space_score !== undefined &&
+    cluster?.white_space_score !== null &&
+    !Number.isNaN(cluster.white_space_score);
 
   const nodes: ChainNodeDef[] = [
     {
       id: "OPPORTUNITY",
       label: "OPPORTUNITY",
       shortSummary: cluster?.label
-        ? `${cluster.label} (Score: ${formatScore(cluster.white_space_score)})`
+        ? `${cluster.label} (${hasValidWhiteSpaceScore ? `Score: ${formatScore(cluster.white_space_score)}` : "Score: N/A"})`
         : "Identified White Space",
     },
     {
@@ -60,8 +100,8 @@ export function CausalChain({ cluster, candidate, verdict, scorecard }: CausalCh
     {
       id: "PRIOR-ART CHALLENGE",
       label: "PRIOR-ART CHALLENGE",
-      shortSummary: verdict?.cited_patents?.length
-        ? `${verdict.cited_patents.length} challenging patents cited`
+      shortSummary: effectiveChallengingPatents.length
+        ? `${effectiveChallengingPatents.length} challenging patents cited`
         : "Adversarial Objections",
     },
     {
@@ -74,10 +114,9 @@ export function CausalChain({ cluster, candidate, verdict, scorecard }: CausalCh
     {
       id: "SURVIVAL",
       label: "SURVIVAL",
-      shortSummary:
-        verdict?.verdict === "survives"
-          ? "Survives prior-art challenge"
-          : `Verdict: ${verdict?.verdict || "Evaluated"}`,
+      shortSummary: isSurvived
+        ? "Survives prior-art challenge"
+        : "Failed prior-art challenge",
     },
     {
       id: "EVIDENCE",
@@ -120,37 +159,48 @@ export function CausalChain({ cluster, candidate, verdict, scorecard }: CausalCh
             <div className={styles.nodeCardHeader}>
               <span className={styles.nodeTag}>1. OPPORTUNITY</span>
               <h4 className={styles.nodeCardTitle}>
-                {cluster?.label || "Target White-Space Cluster"}
+                {cluster?.label || "Target Cluster"}
               </h4>
+              <p style={{ fontSize: "0.8rem", color: "#94a3b8", margin: "0.25rem 0 0 0" }}>
+                Question: Why does this opportunity exist? (¿Por qué existe esta oportunidad?)
+              </p>
             </div>
             <div className={styles.nodeCardBody}>
-              <div className={styles.metaRow}>
-                <div className={styles.metaItem}>
-                  <span className={styles.metaLabel}>White-Space Score</span>
-                  <span className={styles.metaValueHighlight}>
-                    {formatScore(cluster?.white_space_score)}
-                  </span>
-                </div>
-                <div className={styles.metaItem}>
-                  <span className={styles.metaLabel}>Cluster Density</span>
-                  <span className={styles.metaValue}>
-                    {cluster?.patent_count !== undefined
-                      ? `${cluster.patent_count} patents analyzed`
-                      : "Uncrowded area"}
-                  </span>
-                </div>
-                <div className={styles.metaItem}>
-                  <span className={styles.metaLabel}>Opportunity Status</span>
-                  <span className={styles.metaValue}>
-                    {cluster?.is_white_space !== false
-                      ? "High-potential white space"
-                      : "Established cluster"}
-                  </span>
-                </div>
-              </div>
-              <p className={styles.nodeText}>
-                The agent identified an under-explored technology boundary with low prior-art saturation and favorable white-space differentiation potential.
-              </p>
+              {cluster ? (
+                <>
+                  <div className={styles.metaRow}>
+                    <div className={styles.metaItem}>
+                      <span className={styles.metaLabel}>White-Space Score</span>
+                      <span className={styles.metaValueHighlight}>
+                        {formatScore(cluster.white_space_score)}
+                      </span>
+                    </div>
+                    <div className={styles.metaItem}>
+                      <span className={styles.metaLabel}>Cluster Density</span>
+                      <span className={styles.metaValue}>
+                        {cluster.patent_count !== undefined
+                          ? `${cluster.patent_count} patents analyzed`
+                          : "Uncrowded area"}
+                      </span>
+                    </div>
+                    <div className={styles.metaItem}>
+                      <span className={styles.metaLabel}>Opportunity Status</span>
+                      <span className={styles.metaValue}>
+                        {hasValidWhiteSpaceScore
+                          ? "High-potential white space"
+                          : "White-space unvalidated (Evidence unavailable)"}
+                      </span>
+                    </div>
+                  </div>
+                  <p className={styles.nodeText}>
+                    {hasValidWhiteSpaceScore
+                      ? "The agent identified an under-explored technology boundary with low prior-art saturation and favorable white-space differentiation potential."
+                      : "The agent surveyed baseline patents in this cluster; quantitative white-space score is unavailable."}
+                  </p>
+                </>
+              ) : (
+                <p className={styles.emptyNote}>Evidence unavailable for this step.</p>
+              )}
             </div>
           </div>
         );
@@ -161,6 +211,9 @@ export function CausalChain({ cluster, candidate, verdict, scorecard }: CausalCh
             <div className={styles.nodeCardHeader}>
               <span className={styles.nodeTag}>2. PRIOR ART</span>
               <h4 className={styles.nodeCardTitle}>Baseline Landscape Patents</h4>
+              <p style={{ fontSize: "0.8rem", color: "#94a3b8", margin: "0.25rem 0 0 0" }}>
+                Question: What prior art did the agent survey? (¿Qué conocía el agente?)
+              </p>
             </div>
             <div className={styles.nodeCardBody}>
               <p className={styles.nodeText}>
@@ -168,7 +221,7 @@ export function CausalChain({ cluster, candidate, verdict, scorecard }: CausalCh
               </p>
               {renderPatentList(
                 cluster?.representative_patents,
-                "No representative patents recorded.",
+                "Evidence unavailable for this step.",
               )}
             </div>
           </div>
@@ -182,22 +235,27 @@ export function CausalChain({ cluster, candidate, verdict, scorecard }: CausalCh
                 3. PRIOR-ART CHALLENGE
               </span>
               <h4 className={styles.nodeCardTitle}>Adversarial Invalidation Attack</h4>
+              <p style={{ fontSize: "0.8rem", color: "#94a3b8", margin: "0.25rem 0 0 0" }}>
+                Question: What did the agent attempt to attack? (¿Qué intentó destruir?)
+              </p>
             </div>
             <div className={styles.nodeCardBody}>
               <p className={styles.nodeText}>
                 The adversarial examiner challenged the candidate against prior-art citations to test novelty and obviousness:
               </p>
               {renderPatentList(
-                verdict?.cited_patents && verdict.cited_patents.length > 0
-                  ? verdict.cited_patents
+                effectiveChallengingPatents.length > 0
+                  ? effectiveChallengingPatents
                   : cluster?.representative_patents?.slice(0, 2),
-                "No specific blocking patents cited.",
+                "Evidence unavailable for this step.",
               )}
-              {verdict?.rationale && (
+              {verdict?.rationale ? (
                 <div className={styles.quoteBox}>
                   <span className={styles.quoteLabel}>Examiner Objection:</span>
                   <p className={styles.quoteText}>{verdict.rationale}</p>
                 </div>
+              ) : (
+                <p className={styles.emptyNote}>Evidence unavailable for this step.</p>
               )}
             </div>
           </div>
@@ -209,18 +267,22 @@ export function CausalChain({ cluster, candidate, verdict, scorecard }: CausalCh
             <div className={styles.nodeCardHeader}>
               <span className={styles.nodeTag}>4. REVISION</span>
               <h4 className={styles.nodeCardTitle}>Claim Adaptation & Narrowing</h4>
+              <p style={{ fontSize: "0.8rem", color: "#94a3b8", margin: "0.25rem 0 0 0" }}>
+                Question: What claims were revised? (¿Qué cambió?)
+              </p>
             </div>
             <div className={styles.nodeCardBody}>
               <p className={styles.nodeText}>
                 The candidate claims were refined to differentiate specifically over the cited prior-art mechanisms:
               </p>
-              <div className={styles.calloutBox}>
-                <span className={styles.calloutLabel}>Claimed Novelty:</span>
-                <p className={styles.calloutText}>
-                  {candidate?.claimed_novelty ||
-                    "Narrowed technical parameters and interfacial structure to establish defensible non-obviousness."}
-                </p>
-              </div>
+              {candidate?.claimed_novelty ? (
+                <div className={styles.calloutBox}>
+                  <span className={styles.calloutLabel}>Claimed Novelty:</span>
+                  <p className={styles.calloutText}>{candidate.claimed_novelty}</p>
+                </div>
+              ) : (
+                <p className={styles.emptyNote}>Evidence unavailable for this step.</p>
+              )}
             </div>
           </div>
         );
@@ -229,26 +291,51 @@ export function CausalChain({ cluster, candidate, verdict, scorecard }: CausalCh
         return (
           <div key="SURVIVAL" className={styles.nodeCard}>
             <div className={styles.nodeCardHeader}>
-              <span className={`${styles.nodeTag} ${styles.survivalTag}`}>
+              <span
+                className={`${styles.nodeTag} ${
+                  isSurvived ? styles.survivalTag : styles.challengeTag
+                }`}
+              >
                 5. SURVIVAL
               </span>
               <h4 className={styles.nodeCardTitle}>
-                {verdict?.verdict === "survives"
+                {isSurvived
                   ? "Survives Prior-Art Challenge"
-                  : "Verdict Evaluation"}
+                  : "Rejected — Anticipated by Prior Art"}
               </h4>
+              <p style={{ fontSize: "0.8rem", color: "#94a3b8", margin: "0.25rem 0 0 0" }}>
+                Question: Why did this invention survive? (¿Por qué pasó?)
+              </p>
             </div>
             <div className={styles.nodeCardBody}>
               <p className={styles.nodeText}>
-                Differentiation rationale confirming the candidate successfully overcame the adversarial challenge:
+                {isSurvived
+                  ? "Differentiation rationale confirming the candidate successfully overcame the adversarial challenge:"
+                  : "Adversarial evaluation determined that the candidate is directly anticipated by pre-existing patents in the landscape:"}
               </p>
-              <div className={styles.quoteBox}>
-                <span className={styles.quoteLabel}>Differentiation Rationale:</span>
-                <p className={styles.quoteText}>
-                  {candidate?.claimed_novelty ||
-                    "The candidate demonstrates distinct functional characteristics that are neither anticipated nor rendered obvious by the cited references."}
-                </p>
-              </div>
+              {isSurvived ? (
+                candidate?.claimed_novelty || verdict?.rationale ? (
+                  <div className={styles.quoteBox}>
+                    <span className={styles.quoteLabel}>Differentiation Rationale:</span>
+                    <p className={styles.quoteText}>
+                      {candidate?.claimed_novelty || verdict?.rationale}
+                    </p>
+                  </div>
+                ) : (
+                  <p className={styles.emptyNote}>Evidence unavailable for this step.</p>
+                )
+              ) : (
+                <div className={styles.quoteBox} style={{ borderColor: "#ef4444" }}>
+                  <span className={styles.quoteLabel} style={{ color: "#ef4444" }}>
+                    Rejection Finding:
+                  </span>
+                  <p className={styles.quoteText}>
+                    {scorecard?.summary ||
+                      verdict?.rationale ||
+                      "The candidate claims were anticipated by prior art publications and cannot be recommended."}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -261,52 +348,61 @@ export function CausalChain({ cluster, candidate, verdict, scorecard }: CausalCh
               <h4 className={styles.nodeCardTitle}>
                 Supporting Citations & Assessment Scores
               </h4>
+              <p style={{ fontSize: "0.8rem", color: "#94a3b8", margin: "0.25rem 0 0 0" }}>
+                Question: What evidence proves this score? (¿Qué lo demuestra?)
+              </p>
             </div>
             <div className={styles.nodeCardBody}>
-              {scorecard?.summary && (
-                <div className={styles.summaryBox}>
-                  <span className={styles.summaryLabel}>Final Assessment:</span>
-                  <p className={styles.summaryText}>{scorecard.summary}</p>
-                </div>
+              {scorecard ? (
+                <>
+                  {scorecard.summary && (
+                    <div className={styles.summaryBox}>
+                      <span className={styles.summaryLabel}>Final Assessment:</span>
+                      <p className={styles.summaryText}>{scorecard.summary}</p>
+                    </div>
+                  )}
+                  {scorecard.supporting_evidence && scorecard.supporting_evidence.length > 0 && (
+                    <div className={styles.evidenceSection}>
+                      <span className={styles.metaLabel}>Supporting Evidence Citations:</span>
+                      <ul className={styles.evidenceList}>
+                        {scorecard.supporting_evidence.map((item, idx) => (
+                          <li key={idx} className={styles.evidenceItem}>
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <div className={styles.scoresRow}>
+                    <div className={styles.scorePill}>
+                      <span className={styles.scorePillLabel}>Novelty</span>
+                      <span className={styles.scorePillVal}>
+                        {formatScore(scorecard.novelty)}
+                      </span>
+                    </div>
+                    <div className={styles.scorePill}>
+                      <span className={styles.scorePillLabel}>Prior-Art Risk</span>
+                      <span className={styles.scorePillVal}>
+                        {formatScore(scorecard.prior_art_risk)}
+                      </span>
+                    </div>
+                    <div className={styles.scorePill}>
+                      <span className={styles.scorePillLabel}>Differentiation</span>
+                      <span className={styles.scorePillVal}>
+                        {formatScore(scorecard.differentiation)}
+                      </span>
+                    </div>
+                    <div className={styles.scorePill}>
+                      <span className={styles.scorePillLabel}>Evidence</span>
+                      <span className={styles.scorePillVal}>
+                        {formatScore(scorecard.evidence)}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className={styles.emptyNote}>Evidence unavailable for this step.</p>
               )}
-              {scorecard?.supporting_evidence && scorecard.supporting_evidence.length > 0 && (
-                <div className={styles.evidenceSection}>
-                  <span className={styles.metaLabel}>Supporting Evidence Citations:</span>
-                  <ul className={styles.evidenceList}>
-                    {scorecard.supporting_evidence.map((item, idx) => (
-                      <li key={idx} className={styles.evidenceItem}>
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <div className={styles.scoresRow}>
-                <div className={styles.scorePill}>
-                  <span className={styles.scorePillLabel}>Novelty</span>
-                  <span className={styles.scorePillVal}>
-                    {formatScore(scorecard?.novelty)}
-                  </span>
-                </div>
-                <div className={styles.scorePill}>
-                  <span className={styles.scorePillLabel}>Prior-Art Risk</span>
-                  <span className={styles.scorePillVal}>
-                    {formatScore(scorecard?.prior_art_risk)}
-                  </span>
-                </div>
-                <div className={styles.scorePill}>
-                  <span className={styles.scorePillLabel}>Differentiation</span>
-                  <span className={styles.scorePillVal}>
-                    {formatScore(scorecard?.differentiation)}
-                  </span>
-                </div>
-                <div className={styles.scorePill}>
-                  <span className={styles.scorePillLabel}>Evidence</span>
-                  <span className={styles.scorePillVal}>
-                    {formatScore(scorecard?.evidence)}
-                  </span>
-                </div>
-              </div>
             </div>
           </div>
         );
