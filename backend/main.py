@@ -370,6 +370,29 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
         )
 
 
+_QUOTA_FRIENDLY_MESSAGE = (
+    "This analysis couldn't be completed because the AI service has reached its "
+    "current usage limit. Your research has not been lost — please try again "
+    "later, once the quota resets."
+)
+
+
+def _classify_error(exc: Exception) -> dict:
+    """Map a raw exception to a user-facing error_type + message.
+
+    Gemini's free tier returns 429 RESOURCE_EXHAUSTED both for short-window
+    rate limits (retry-after seconds, fine to auto-retry) and for the daily
+    per-project/per-model request cap (retrying does nothing until the quota
+    resets). Only the daily-cap message names "PerDay" in its quotaId, so
+    that's the signal we key off — an immediate "Try again" is actively
+    misleading for that case.
+    """
+    text = str(exc)
+    if "RESOURCE_EXHAUSTED" in text and "PerDay" in text:
+        return {"error_type": "quota_exhausted", "detail": _QUOTA_FRIENDLY_MESSAGE}
+    return {"error_type": "unknown", "detail": text[:300]}
+
+
 async def _run_job(job_id: str, req: AnalyzeRequest) -> None:
     async with _analyze_lock:
         try:
@@ -385,6 +408,7 @@ async def _run_job(job_id: str, req: AnalyzeRequest) -> None:
                 "status": "error",
                 "stage": "error",
                 "events": _jobs[job_id].get("events", []),
+                "error_type": "timeout",
                 "detail": f"Agent run exceeded {_ANALYZE_TIMEOUT_S}s.",
             }
         except Exception as exc:
@@ -393,7 +417,7 @@ async def _run_job(job_id: str, req: AnalyzeRequest) -> None:
                 "status": "error",
                 "stage": "error",
                 "events": _jobs[job_id].get("events", []),
-                "detail": str(exc)[:300],
+                **_classify_error(exc),
             }
 
 

@@ -14,6 +14,7 @@ export function App() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<JobStatusResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorType, setErrorType] = useState<JobStatusResponse["error_type"] | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const handleStartAnalysis = async (searchDomain: string, searchQuery: string) => {
@@ -21,6 +22,7 @@ export function App() {
     setDomain(searchDomain);
     setQuery(searchQuery);
     setErrorMessage(null);
+    setErrorType(null);
 
     try {
       const res = await startAnalyze(searchDomain, searchQuery);
@@ -63,6 +65,7 @@ export function App() {
               res.detail ||
               "We couldn't complete the analysis. Your opportunity wasn't lost. Try again."
           );
+          setErrorType(res.error_type ?? null);
           setView("error");
         }
       } catch (err) {
@@ -90,6 +93,7 @@ export function App() {
     setJobId(null);
     setJobStatus(null);
     setErrorMessage(null);
+    setErrorType(null);
   };
 
   const handleRetry = () => {
@@ -124,12 +128,19 @@ export function App() {
   }
 
   if (view === "error") {
+    const isQuotaExhausted = errorType === "quota_exhausted";
     return (
       <main className="errorContainer">
         <header className="errorHeader">
           {domain && <div className="errorDomainBadge">{domain}</div>}
-          <h1 className="errorTitle">We couldn't complete the analysis.</h1>
-          <p className="errorSubtitle">Your opportunity wasn't lost. Try again.</p>
+          <h1 className="errorTitle">
+            {isQuotaExhausted ? "AI usage limit reached" : "We couldn't complete the analysis."}
+          </h1>
+          <p className="errorSubtitle">
+            {isQuotaExhausted
+              ? "Your research has not been lost. Please try again later."
+              : "Your opportunity wasn't lost. Try again."}
+          </p>
         </header>
 
         {errorMessage && (
@@ -143,9 +154,11 @@ export function App() {
         )}
 
         <div className="errorActions">
-          <button type="button" className="errorPrimaryBtn" onClick={handleRetry}>
-            Try again
-          </button>
+          {!isQuotaExhausted && (
+            <button type="button" className="errorPrimaryBtn" onClick={handleRetry}>
+              Try again
+            </button>
+          )}
           <button type="button" className="errorSecondaryBtn" onClick={handleReset}>
             ← Analyze another opportunity
           </button>

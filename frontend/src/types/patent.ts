@@ -112,6 +112,7 @@ export interface JobStatusResponse {
   verdicts?: AdversarialVerdict[];
   scorecards?: ScoreCard[];
   error?: string;
+  error_type?: "quota_exhausted" | "timeout" | "unknown";
   detail?: string;
 }
 
