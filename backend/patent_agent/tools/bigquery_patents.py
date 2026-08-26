@@ -57,8 +57,12 @@ class BigQueryPatentsDataSource:
     def __init__(self, project: str):
         from google.cloud import bigquery
 
-        self._client = bigquery.Client(project=project)
         self._mock_fallback = MockPatentsDataSource()
+        try:
+            self._client = bigquery.Client(project=project)
+        except Exception:
+            logger.warning("BigQuery client init failed, falling back to mock data", exc_info=True)
+            self._client = None
 
     def _row_to_patent_record(self, row) -> PatentRecord:
         cpc_codes = getattr(row, "cpc_codes", []) or []
