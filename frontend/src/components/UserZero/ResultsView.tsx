@@ -210,8 +210,7 @@ export function ResultsView({ domain, result, onReset }: ResultsViewProps) {
               <span className={styles.survivesBadge}>✓ Survives Prior-Art Challenge</span>
             </div>
             <p className={styles.differentiationText}>
-              {currentVerdict?.rationale ||
-                currentCandidate.claimed_novelty ||
+              {currentCandidate.claimed_novelty ||
                 "Clear functional differentiation from cited prior art establishes strong novelty and freedom-to-operate potential."}
             </p>
           </div>
@@ -298,7 +297,7 @@ export function ResultsView({ domain, result, onReset }: ResultsViewProps) {
 
             {currentScorecard?.summary && (
               <div className={styles.summaryBox}>
-                <span className={styles.summaryLabel}>Governor Assessment:</span>
+                <span className={styles.summaryLabel}>Final Assessment:</span>
                 <p className={styles.summaryText}>{currentScorecard.summary}</p>
               </div>
             )}

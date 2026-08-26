@@ -245,7 +245,7 @@ export function CausalChain({ cluster, candidate, verdict, scorecard }: CausalCh
               <div className={styles.quoteBox}>
                 <span className={styles.quoteLabel}>Differentiation Rationale:</span>
                 <p className={styles.quoteText}>
-                  {verdict?.rationale ||
+                  {candidate?.claimed_novelty ||
                     "The candidate demonstrates distinct functional characteristics that are neither anticipated nor rendered obvious by the cited references."}
                 </p>
               </div>
@@ -265,7 +265,7 @@ export function CausalChain({ cluster, candidate, verdict, scorecard }: CausalCh
             <div className={styles.nodeCardBody}>
               {scorecard?.summary && (
                 <div className={styles.summaryBox}>
-                  <span className={styles.summaryLabel}>Governor Assessment:</span>
+                  <span className={styles.summaryLabel}>Final Assessment:</span>
                   <p className={styles.summaryText}>{scorecard.summary}</p>
                 </div>
               )}
