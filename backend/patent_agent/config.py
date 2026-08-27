@@ -14,7 +14,7 @@ INVENTION_LOOP_MAX_ITERATIONS = int(os.getenv("INVENTION_LOOP_MAX_ITERATIONS", "
 # the Cloud Run demo path) or "openrouter" (dev-validation path that avoids
 # burning GEMINI_API_KEY's free-tier quota — see render.yaml).
 MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", "gemini").lower()
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-chat-v3.1:free")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "z-ai/glm-5.2:free")
 
 
 def get_agent_model():
