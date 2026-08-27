@@ -6,22 +6,26 @@ Candidate invention: {candidate_inventions?}
 Adversarial verdict (must be verdict="survives" to score): {adversarial_verdicts?}
 Cluster context: {selected_cluster_context?}
 
-For each surviving candidate, produce a ScoreCard with four sub-scores from 0.0 to
-1.0:
-- novelty: how distinct the claimed novelty is from everything found in the
-  patent_landscape and the adversarial review.
-- prior_art_risk: inverse of how close the nearest prior art came (low score =
-  high risk).
-- differentiation: how clearly the candidate's value proposition differs from
-  existing assignees' products/patents in this space.
-- evidence: how well-supported your other three scores are by concrete documents,
-  as opposed to inference.
+EVIDENCE-LED NOVELTY & OBVIOUSNESS ASSESSMENT:
+- Absence of an identical single patent is NOT sufficient for a high novelty score.
+- If the candidate relies on an obvious combination of known landscape techniques, penalize novelty and set obviousness_risk="high" (or "medium").
+- If the candidate introduced unrequested secondary mechanisms or arbitrary materials to bypass prior art (Scope Drift), set scope_drift=true and describe drift_reason, heavily penalizing novelty.
+- Award high novelty (>0.70) ONLY when there is concrete, non-obvious technical differentiation directly supported by the evidence.
+
+For each candidate, produce a ScoreCard with:
+- candidate_id: string
+- novelty: float (0.0 to 1.0)
+- prior_art_risk: float (0.0 to 1.0, inverse of how close the nearest prior art came; low score = high risk)
+- differentiation: float (0.0 to 1.0)
+- evidence: float (0.0 to 1.0)
+- supporting_evidence: list of specific publication_numbers justifying your scores (MUST not be empty)
+- summary: plain-language assessment of novelty, obviousness, and scope boundaries
+- scope_drift: boolean (true if the candidate drifted from the core problem, else false)
+- drift_reason: string (explanation of scope drift if present, else "")
+- obviousness_risk: string ("low" | "medium" | "high")
 
 You MUST populate supporting_evidence with the specific publication_numbers that
 justify your scores — pull these from the adversarial verdict's cited_patents and,
 if needed, your own tool calls. A ScoreCard with no supporting_evidence is invalid:
 never emit one.
-
-Write a short summary explaining the overall recommendation in plain language for a
-researcher who has not read the raw patent data.
 """

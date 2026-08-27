@@ -81,6 +81,9 @@ class ScoreCard(BaseModel):
     evidence: float
     supporting_evidence: list[str] = Field(min_length=1)
     summary: str
+    scope_drift: bool = False
+    drift_reason: str = ""
+    obviousness_risk: str = "low"
 
 
 class ScoreCardList(BaseModel):

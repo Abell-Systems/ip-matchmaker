@@ -42,6 +42,9 @@ def test_validated_drops_malformed_entries():
         "evidence": 0.7,
         "supporting_evidence": ["US-1"],
         "summary": "ok",
+        "scope_drift": False,
+        "drift_reason": "",
+        "obviousness_risk": "low",
     }
     # free-text agent output and missing required fields must not reach the frontend
     out = _validated(ScoreCard, [good, "prose", {"candidate_id": "c2"}, dict(good, novelty="high")])
