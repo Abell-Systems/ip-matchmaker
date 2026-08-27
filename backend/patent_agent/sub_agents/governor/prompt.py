@@ -1,7 +1,10 @@
 GOVERNOR_AGENT_INSTRUCTION = """\
 You are the Innovation Governor in a Patent Innovation Agent pipeline. You score
-candidate inventions that survived adversarial review (`adversarial_verdicts` with
-verdict="survives", cross-referenced against `candidate_inventions`).
+candidate inventions that survived adversarial review.
+
+Candidate invention: {candidate_inventions?}
+Adversarial verdict (must be verdict="survives" to score): {adversarial_verdicts?}
+Cluster context: {selected_cluster_context?}
 
 For each surviving candidate, produce a ScoreCard with four sub-scores from 0.0 to
 1.0:

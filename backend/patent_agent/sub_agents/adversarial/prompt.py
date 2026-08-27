@@ -1,7 +1,9 @@
 ADVERSARIAL_AGENT_INSTRUCTION = """\
 You are the Adversarial Agent in a Patent Innovation Agent pipeline. Your job is to
-try to kill the current candidate invention (`candidate_inventions` in state) using
-prior art.
+try to kill the current candidate invention using prior art.
+
+Candidate invention: {candidate_inventions?}
+Cluster context it was proposed against: {selected_cluster_context?}
 
 Use get_similar_patents_tool and get_citations_tool (and search_patents_tool if
 needed) to look for patents that anticipate or closely overlap the candidate's

@@ -11,4 +11,6 @@ adversarial_agent = LlmAgent(
     instruction=ADVERSARIAL_AGENT_INSTRUCTION,
     tools=[search_patents_tool, get_similar_patents_tool, get_citations_tool, exit_loop],
     output_key=ADVERSARIAL_VERDICTS,
+    # ponytail: same fix as inventor_agent — see its include_contents comment.
+    include_contents="none",
 )

@@ -28,9 +28,11 @@ from patent_agent.shared.state_keys import (  # noqa: E402
     ADVERSARIAL_VERDICTS,
     CANDIDATE_INVENTIONS,
     SCORED_CANDIDATES,
+    SELECTED_CLUSTER_CONTEXT,
 )
 from patent_agent.tools.bigquery_patents import get_patents_datasource  # noqa: E402
 from patent_agent.tools.clustering import cluster_patents, patents_for_demand_signal  # noqa: E402
+from patent_agent.tools.context import build_cluster_context  # noqa: E402
 from patent_agent.tools.demand_sources import get_demand_datasource  # noqa: E402
 from patent_agent.tools.schemas import (  # noqa: E402
     AdversarialVerdict,
@@ -266,10 +268,18 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
     )
     
     cluster_id = req.cluster_id or (clusters[0].cluster_id if clusters else "unknown")
-    
+    selected_cluster = next((c for c in clusters if c.cluster_id == cluster_id), None)
+    cluster_context = (
+        build_cluster_context(selected_cluster, records, demand_signals) if selected_cluster else ""
+    )
+
     _jobs[job_id]["stage"] = "inventing"
-    
-    session = await _session_service.create_session(app_name="ip_matchmaker", user_id="web")
+
+    session = await _session_service.create_session(
+        app_name="ip_matchmaker",
+        user_id="web",
+        state={SELECTED_CLUSTER_CONTEXT: cluster_context},
+    )
     prompt = (
         f"Mine the patent landscape for domain '{req.domain}' (query: '{req.query}'), "
         f"then propose, adversarially test, and score candidate inventions for cluster "

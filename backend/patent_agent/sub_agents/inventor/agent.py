@@ -12,4 +12,9 @@ inventor_agent = LlmAgent(
     tools=[],
     output_key=CANDIDATE_INVENTIONS,
     output_schema=InventionCandidate,
+    # ponytail: full conversation replay (default) drags research_agent's raw
+    # tool-call history (20 patents + citations) into every inventor call,
+    # blowing free-tier TPM budgets. The compact cluster context and prior
+    # verdict are injected via state placeholders in the instruction instead.
+    include_contents="none",
 )

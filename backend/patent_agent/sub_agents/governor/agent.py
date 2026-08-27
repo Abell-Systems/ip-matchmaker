@@ -12,4 +12,6 @@ governor_agent = LlmAgent(
     tools=[],
     output_key=SCORED_CANDIDATES,
     output_schema=ScoreCardList,
+    # ponytail: same fix as inventor_agent — see its include_contents comment.
+    include_contents="none",
 )

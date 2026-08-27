@@ -125,6 +125,7 @@ User → Frontend → Cloud Run / FastAPI (Entrypoint)
 | State Key | Producer Agent | Consumer Agent(s) / Outputs |
 |---|---|---|
 | `patent_landscape` | `research_agent` | `clustering` tool, `inventor_agent` |
+| `selected_cluster_context` | seeded by `main.py` (see `tools/context.py`) | `inventor_agent`, `adversarial_agent`, `governor_agent` |
 | `candidate_inventions` | `inventor_agent` | `adversarial_agent`, `governor_agent`, frontend |
 | `adversarial_verdicts` | `adversarial_agent` | `inventor_agent` (iteration loop), `governor_agent`, frontend |
 | `scored_candidates` | `governor_agent` | Frontend ScoreCard display |
