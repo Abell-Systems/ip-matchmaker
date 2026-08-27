@@ -52,18 +52,55 @@ def show(label: str, value):
 
 
 class RateLimiter(BasePlugin):
-    """Free tier allows 5 requests/min; pace model calls one per 13s."""
+    """Paces model calls under two limits so free/preview tiers don't 429:
+    a minimum gap between calls (RPM-style, what this was originally written
+    for on Gemini's free tier) and a token budget over a trailing window
+    (TPM-style — Groq's qwen preview caps at 8K tokens/60s). A fixed inter-
+    call delay alone isn't enough for TPM caps: two calls individually under
+    budget can still sum past it within the same rolling window, which is
+    exactly what happened live on Groq. Tunable via env vars so a different
+    provider/tier doesn't need a code change.
+    """
 
     def __init__(self) -> None:
         super().__init__(name="rate_limiter")
-        self._last = 0.0
+        self._min_gap = float(os.getenv("RATE_LIMIT_MIN_GAP_SECONDS", "13"))
+        self._tpm_budget = int(os.getenv("RATE_LIMIT_TPM_BUDGET", "7000"))
+        self._window_seconds = float(os.getenv("RATE_LIMIT_TPM_WINDOW_SECONDS", "60"))
+        self._last_call = 0.0
+        self._calls: list[tuple[float, int]] = []  # (timestamp, estimated_tokens)
+
+    @staticmethod
+    def _estimate_tokens(llm_request) -> int:
+        """Rough token proxy (chars/4) over the request's contents/config —
+        precise enough to pace calls, not to bill."""
+        try:
+            text = str(llm_request.contents) + str(llm_request.config)
+        except Exception:
+            return 2000  # conservative fallback if the request shape ever changes
+        return max(len(text) // 4, 1)
 
     async def before_model_callback(self, *, callback_context, llm_request):
-        wait = self._last + 13 - time.monotonic()
-        if wait > 0:
-            print(f"  [rate-limit] waiting {wait:.0f}s...")
-            await asyncio.sleep(wait)
-        self._last = time.monotonic()
+        now = time.monotonic()
+
+        gap_wait = self._last_call + self._min_gap - now
+        if gap_wait > 0:
+            await asyncio.sleep(gap_wait)
+            now = time.monotonic()
+
+        self._calls = [(t, tok) for t, tok in self._calls if now - t < self._window_seconds]
+        estimated = self._estimate_tokens(llm_request)
+        used = sum(tok for _, tok in self._calls)
+        if self._calls and used + estimated > self._tpm_budget:
+            budget_wait = self._window_seconds - (now - self._calls[0][0]) + 0.5
+            if budget_wait > 0:
+                print(f"  [rate-limit] pacing {budget_wait:.0f}s to stay under {self._tpm_budget} TPM...")
+                await asyncio.sleep(budget_wait)
+                now = time.monotonic()
+                self._calls = [(t, tok) for t, tok in self._calls if now - t < self._window_seconds]
+
+        self._last_call = now
+        self._calls.append((now, estimated))
         return None
 
 
