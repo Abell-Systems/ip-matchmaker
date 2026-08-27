@@ -20,4 +20,9 @@ Adversarial verdict on it: {adversarial_verdicts?}
 
 Output a single InventionCandidate: candidate_id, cluster_id, title, description,
 and claimed_novelty (what specifically distinguishes it from the cited prior art).
+
+Keep description under 120 words and claimed_novelty under 80 words — concrete
+and specific, not padded. This candidate gets re-read in full by every later
+step (adversarial review, scoring), so verbosity here costs budget everywhere
+downstream.
 """
