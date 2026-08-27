@@ -10,10 +10,12 @@ services:
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
     envVars:
-      - key: GEMINI_API_KEY
+      - key: MODEL_PROVIDER
+        value: openrouter # avoids burning GEMINI_API_KEY's free-tier quota; Cloud Run stays on gemini
+      - key: OPENROUTER_MODEL
+        value: deepseek/deepseek-chat-v3.1:free
+      - key: OPENROUTER_API_KEY
         sync: false # set in Render dashboard — never commit real keys
-      - key: GEMINI_MODEL
-        value: gemini-3.5-flash-lite # separate free-tier quota bucket from the demo model
       - key: USE_MOCK_BIGQUERY
         value: "true" # no GCP credentials needed for dev validation
       - key: DEMAND_SOURCE

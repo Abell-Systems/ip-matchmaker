@@ -11,7 +11,8 @@ def test_health_endpoint_details():
     data = res.json()
     assert data["status"] == "ok"
     assert "use_mock_bigquery" in data
-    assert "gemini_api_key_configured" in data
+    assert "model_provider" in data
+    assert "api_key_configured" in data
     assert "model" in data
 
 

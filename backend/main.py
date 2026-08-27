@@ -65,11 +65,19 @@ app.router.routes = [r for r in app.router.routes if getattr(r, "path", None) !=
 
 @app.get("/health")
 def health() -> dict:
+    provider = os.getenv("MODEL_PROVIDER", "gemini").lower()
+    if provider == "openrouter":
+        model = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-chat-v3.1:free")
+        api_key_configured = bool(os.getenv("OPENROUTER_API_KEY"))
+    else:
+        model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+        api_key_configured = bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
     return {
         "status": "ok",
         "use_mock_bigquery": os.getenv("USE_MOCK_BIGQUERY", "true"),
-        "gemini_api_key_configured": bool(os.getenv("GEMINI_API_KEY")),
-        "model": os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
+        "model_provider": provider,
+        "model": model,
+        "api_key_configured": api_key_configured,
     }
 
 
