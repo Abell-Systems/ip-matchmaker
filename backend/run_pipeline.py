@@ -65,20 +65,23 @@ class RateLimiter(BasePlugin):
     def __init__(self) -> None:
         super().__init__(name="rate_limiter")
         self._min_gap = float(os.getenv("RATE_LIMIT_MIN_GAP_SECONDS", "13"))
-        self._tpm_budget = int(os.getenv("RATE_LIMIT_TPM_BUDGET", "7000"))
+        self._tpm_budget = int(os.getenv("RATE_LIMIT_TPM_BUDGET", "6000"))
         self._window_seconds = float(os.getenv("RATE_LIMIT_TPM_WINDOW_SECONDS", "60"))
         self._last_call = 0.0
         self._calls: list[tuple[float, int]] = []  # (timestamp, estimated_tokens)
 
     @staticmethod
     def _estimate_tokens(llm_request) -> int:
-        """Rough token proxy (chars/4) over the request's contents/config —
-        precise enough to pace calls, not to bill."""
+        """Rough token proxy over the request's contents/config. Uses chars/3,
+        not chars/4: live testing showed chars/4 underestimated actual usage
+        by ~30% (8818 actual vs a 7000 budget that should have paced it) —
+        JSON-heavy tool schemas and structured output tokenize denser than
+        plain prose. Precise enough to pace calls, not to bill."""
         try:
             text = str(llm_request.contents) + str(llm_request.config)
         except Exception:
             return 2000  # conservative fallback if the request shape ever changes
-        return max(len(text) // 4, 1)
+        return max(len(text) // 3, 1)
 
     async def before_model_callback(self, *, callback_context, llm_request):
         now = time.monotonic()
