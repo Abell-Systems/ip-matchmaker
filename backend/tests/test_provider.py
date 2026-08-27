@@ -69,3 +69,12 @@ def test_unsupported_provider_fails_fast(monkeypatch):
 
     with pytest.raises(ValueError, match="Unsupported MODEL_PROVIDER: 'unsupported_provider_xyz'"):
         LLMProvider.get_provider_name()
+
+
+def test_groq_structured_output_capabilities_registered():
+    import litellm
+
+    assert litellm.supports_response_schema("groq/qwen/qwen3.8-27b", "groq") is True
+    assert litellm.supports_response_schema("qwen/qwen3.8-27b", "groq") is True
+    assert litellm.supports_response_schema("groq/openai/gpt-oss-120b", "groq") is True
+
