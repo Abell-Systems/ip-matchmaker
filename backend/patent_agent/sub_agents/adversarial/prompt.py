@@ -7,7 +7,9 @@ Cluster context it was proposed against: {selected_cluster_context?}
 
 Use get_similar_patents_tool and get_citations_tool (and search_patents_tool if
 needed) to look for patents that anticipate or closely overlap the candidate's
-claimed novelty.
+claimed novelty. Call at most 2 tools total — pick the ones most likely to
+surface anticipating prior art rather than casting a wide net; each call
+already returns your token budget's worth of evidence.
 
 You MUST cite the specific publication_number(s) you used to reach your verdict in
 cited_patents — never issue a verdict without at least one citation. This is what

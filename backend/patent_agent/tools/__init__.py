@@ -21,6 +21,10 @@ __all__ = [
 ]
 
 _ABSTRACT_CHARS = 220  # ponytail: matches tools/context.py's budget
+_MAX_RECORDS_PER_CALL = 8  # ponytail: hard clamp — the LLM can pass its own
+# max_results value regardless of the parameter default, and free-tier TPM
+# budgets (8K on Groq) can't absorb an uncapped fan-out. Raise if a bigger
+# model/tier is configured and prior-art recall is the bottleneck instead.
 
 
 def _compact_record(record: PatentRecord) -> dict:
@@ -53,7 +57,7 @@ def search_patents_tool(query: str, domain: str, max_results: int = 20) -> list[
         abstract, assignee, publication_date, cpc_codes, citation_count,
         similarity_score). Use get_patent_by_number_tool for full detail on one.
     """
-    records = get_patents_datasource().search_patents(query, domain, max_results)
+    records = get_patents_datasource().search_patents(query, domain, min(max_results, _MAX_RECORDS_PER_CALL))
     return [_compact_record(r) for r in records]
 
 
@@ -69,11 +73,13 @@ def get_citations_tool(publication_number: str) -> list[dict]:
     """Fetch patents cited by the given publication number (compact records —
     see search_patents_tool)."""
     records = get_patents_datasource().get_citations(publication_number)
-    return [_compact_record(r) for r in records]
+    return [_compact_record(r) for r in records[:_MAX_RECORDS_PER_CALL]]
 
 
 def get_similar_patents_tool(publication_number: str, max_results: int = 5) -> list[dict]:
     """Fetch patents most similar to the given publication number, ranked by
     similarity_score (compact records — see search_patents_tool)."""
-    records = get_patents_datasource().get_similar_patents(publication_number, max_results)
+    records = get_patents_datasource().get_similar_patents(
+        publication_number, min(max_results, _MAX_RECORDS_PER_CALL)
+    )
     return [_compact_record(r) for r in records]
