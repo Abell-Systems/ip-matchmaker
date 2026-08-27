@@ -63,21 +63,23 @@ app = get_fast_api_app(
 app.router.routes = [r for r in app.router.routes if getattr(r, "path", None) != "/health"]
 
 
+from patent_agent.provider import LLMProvider  # noqa: E402
+
+
 @app.get("/health")
 def health() -> dict:
-    provider = os.getenv("MODEL_PROVIDER", "gemini").lower()
-    if provider == "openrouter":
-        model = os.getenv("OPENROUTER_MODEL", "minimax/minimax-m2.7:free")
-        api_key_configured = bool(os.getenv("OPENROUTER_API_KEY"))
-    else:
-        model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
-        api_key_configured = bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+    try:
+        provider_status = LLMProvider.get_status()
+    except Exception as err:
+        provider_status = {
+            "model_provider": os.getenv("MODEL_PROVIDER", "unknown"),
+            "model": "error",
+            "error": str(err),
+        }
     return {
         "status": "ok",
         "use_mock_bigquery": os.getenv("USE_MOCK_BIGQUERY", "true"),
-        "model_provider": provider,
-        "model": model,
-        "api_key_configured": api_key_configured,
+        **provider_status,
     }
 
 
