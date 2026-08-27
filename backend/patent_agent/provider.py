@@ -12,7 +12,7 @@ SUPPORTED_PROVIDERS: Set[str] = {"gemini", "groq", "openrouter", "openai", "anth
 
 DEFAULT_MODELS: Dict[str, str] = {
     "gemini": "gemini-3.5-flash",
-    "groq": "qwen/qwen3-32b",
+    "groq": "qwen/qwen3.8-27b",
     "openrouter": "minimax/minimax-m2.7:free",
     "openai": "gpt-4o-mini",
     "anthropic": "claude-3-5-haiku-20241022",

@@ -28,11 +28,11 @@ def test_groq_provider_resolution(monkeypatch):
     monkeypatch.delenv("GROQ_MODEL", raising=False)
 
     assert LLMProvider.get_provider_name() == "groq"
-    assert LLMProvider.get_model_name() == "qwen/qwen3-32b"
+    assert LLMProvider.get_model_name() == "qwen/qwen3.8-27b"
 
     model_obj = LLMProvider.get_agent_model()
     assert isinstance(model_obj, LiteLlm)
-    assert model_obj.model == "groq/qwen/qwen3-32b"
+    assert model_obj.model == "groq/qwen/qwen3.8-27b"
 
 
 def test_groq_with_custom_model_name(monkeypatch):

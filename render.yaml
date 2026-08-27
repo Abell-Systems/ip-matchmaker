@@ -13,7 +13,7 @@ services:
       - key: MODEL_PROVIDER
         value: groq # options: groq | openrouter | gemini
       - key: MODEL_NAME
-        value: qwen/qwen3-32b
+        value: qwen/qwen3.8-27b
       - key: MODEL_KEY
         sync: false # set in Render dashboard — never commit real keys
       - key: USE_MOCK_BIGQUERY
