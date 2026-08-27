@@ -70,18 +70,25 @@ class RateLimiter(BasePlugin):
         self._last_call = 0.0
         self._calls: list[tuple[float, int]] = []  # (timestamp, estimated_tokens)
 
+    _SAFETY_PAD = 300  # ponytail: flat pad for the estimator's residual bias
+    # (live: 8079 actual vs an 8000 cap after switching to chars/3 — a ~1%
+    # miss, not a systemic one). This is still an estimate, not a guarantee;
+    # the robust version reads litellm's real usage_metadata per call and
+    # feeds that back into the window instead of trusting the pre-flight
+    # guess indefinitely — worth doing if a provider swap makes the request
+    # shape different enough to shift this bias again.
+
     @staticmethod
     def _estimate_tokens(llm_request) -> int:
         """Rough token proxy over the request's contents/config. Uses chars/3,
         not chars/4: live testing showed chars/4 underestimated actual usage
-        by ~30% (8818 actual vs a 7000 budget that should have paced it) —
-        JSON-heavy tool schemas and structured output tokenize denser than
-        plain prose. Precise enough to pace calls, not to bill."""
+        by ~30% — JSON-heavy tool schemas and structured output tokenize
+        denser than plain prose. Precise enough to pace calls, not to bill."""
         try:
             text = str(llm_request.contents) + str(llm_request.config)
         except Exception:
             return 2000  # conservative fallback if the request shape ever changes
-        return max(len(text) // 3, 1)
+        return max(len(text) // 3, 1) + RateLimiter._SAFETY_PAD
 
     async def before_model_callback(self, *, callback_context, llm_request):
         now = time.monotonic()
