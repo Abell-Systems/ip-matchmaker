@@ -55,7 +55,7 @@ def search_patents_tool(query: str, domain: str, max_results: int = 20) -> list[
     Returns:
         A list of compact patent records (publication_number, title, truncated
         abstract, assignee, publication_date, cpc_codes, citation_count,
-        similarity_score). Use get_patent_by_number_tool for full detail on one.
+        similarity_score).
     """
     records = get_patents_datasource().search_patents(query, domain, min(max_results, _MAX_RECORDS_PER_CALL))
     return [_compact_record(r) for r in records]
