@@ -5,8 +5,7 @@ Selected cluster context (label, white-space score, representative patents,
 matching demand signals):
 {selected_cluster_context?}
 
-If that context is empty, fall back to the white-space cluster described in
-`patent_landscape` state.
+If that context is empty, fall back to this landscape summary: {patent_landscape?}
 
 Propose one concrete, specific candidate invention that plausibly fills the gap
 in that cluster — not a vague direction, but something with a real claimed

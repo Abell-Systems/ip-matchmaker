@@ -17,19 +17,23 @@ load_dotenv()
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, Query  # noqa: E402
+from google.adk.agents import LoopAgent, SequentialAgent  # noqa: E402
 from google.adk.cli.fast_api import get_fast_api_app  # noqa: E402
 from google.adk.runners import Runner  # noqa: E402
 from google.adk.sessions import InMemorySessionService  # noqa: E402
 from google.genai import types  # noqa: E402
 from pydantic import BaseModel, Field, ValidationError  # noqa: E402
 
-from patent_agent.agent import root_agent  # noqa: E402
+from patent_agent.config import INVENTION_LOOP_MAX_ITERATIONS  # noqa: E402
 from patent_agent.shared.state_keys import (  # noqa: E402
     ADVERSARIAL_VERDICTS,
     CANDIDATE_INVENTIONS,
     SCORED_CANDIDATES,
     SELECTED_CLUSTER_CONTEXT,
 )
+from patent_agent.sub_agents.adversarial.agent import build_adversarial_agent  # noqa: E402
+from patent_agent.sub_agents.governor.agent import build_governor_agent  # noqa: E402
+from patent_agent.sub_agents.inventor.agent import build_inventor_agent  # noqa: E402
 from patent_agent.tools.bigquery_patents import get_patents_datasource  # noqa: E402
 from patent_agent.tools.clustering import cluster_patents, patents_for_demand_signal  # noqa: E402
 from patent_agent.tools.context import build_cluster_context  # noqa: E402
@@ -132,9 +136,27 @@ def get_patents_for_demand(
     }
 
 
+# /api/analyze pre-mines patents/clusters deterministically in Python (see
+# _execute_analysis below) before ever touching the LLM, so this pipeline skips
+# research_agent entirely — asking it to re-mine via tool calls was pure
+# duplicate work and the single biggest source of prompt bloat (its own
+# multi-tool-call turn could exceed free-tier TPM caps on its own, regardless
+# of the include_contents fix on the agents below). The interactive `adk web`
+# graph (patent_agent/agent.py's root_agent) still includes research_agent —
+# it has no pre-mined data to seed from.
+_invention_loop = LoopAgent(
+    name="invention_loop",
+    sub_agents=[build_inventor_agent(), build_adversarial_agent()],
+    max_iterations=INVENTION_LOOP_MAX_ITERATIONS,
+)
+_analyze_pipeline = SequentialAgent(
+    name="patent_innovation_agent_api",
+    sub_agents=[_invention_loop, build_governor_agent()],
+)
+
 _session_service = InMemorySessionService()
 _runner = Runner(
-    agent=root_agent,
+    agent=_analyze_pipeline,
     app_name="ip_matchmaker",
     session_service=_session_service,
     plugins=[RateLimiter()],
@@ -281,9 +303,8 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
         state={SELECTED_CLUSTER_CONTEXT: cluster_context},
     )
     prompt = (
-        f"Mine the patent landscape for domain '{req.domain}' (query: '{req.query}'), "
-        f"then propose, adversarially test, and score candidate inventions for cluster "
-        f"'{cluster_id}'."
+        f"Propose, adversarially test, and score a candidate invention for cluster "
+        f"'{cluster_id}' in domain '{req.domain}', using the selected cluster context provided."
     )
     msg = types.Content(role="user", parts=[types.Part(text=prompt)])
 
