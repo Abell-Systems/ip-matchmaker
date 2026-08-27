@@ -13,7 +13,7 @@ services:
       - key: MODEL_PROVIDER
         value: openrouter # avoids burning GEMINI_API_KEY's free-tier quota; Cloud Run stays on gemini
       - key: OPENROUTER_MODEL
-        value: z-ai/glm-5.2:free
+        value: minimax/minimax-m2.7:free
       - key: OPENROUTER_API_KEY
         sync: false # set in Render dashboard — never commit real keys
       - key: USE_MOCK_BIGQUERY

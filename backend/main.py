@@ -67,7 +67,7 @@ app.router.routes = [r for r in app.router.routes if getattr(r, "path", None) !=
 def health() -> dict:
     provider = os.getenv("MODEL_PROVIDER", "gemini").lower()
     if provider == "openrouter":
-        model = os.getenv("OPENROUTER_MODEL", "z-ai/glm-5.2:free")
+        model = os.getenv("OPENROUTER_MODEL", "minimax/minimax-m2.7:free")
         api_key_configured = bool(os.getenv("OPENROUTER_API_KEY"))
     else:
         model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
