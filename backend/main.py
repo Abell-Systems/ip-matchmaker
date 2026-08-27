@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import uuid
 
 from dotenv import load_dotenv
@@ -240,6 +241,22 @@ def _emit_event(
     _jobs[job_id]["events"].append(evt)
 
 
+# Pre-flight token-budget pacing (RateLimiter) reduces how often Groq's TPM
+# cap gets hit, but it's an estimate, not a guarantee — actual usage varies
+# run to run. When it does get hit, Groq's own error names the exact wait
+# needed ("Please try again in 6.4875s"); honor that instead of guessing.
+_RETRY_AFTER_RE = re.compile(r"try again in ([\d.]+)(m?s)")
+_MAX_RATE_LIMIT_RETRIES = 3
+
+
+def _retry_after_seconds(exc: Exception) -> float | None:
+    match = _RETRY_AFTER_RE.search(str(exc))
+    if not match:
+        return None
+    value, unit = match.groups()
+    return float(value) / 1000 if unit == "ms" else float(value)
+
+
 def reconcile_candidate_verdicts(
     verdicts: list[dict], scorecards: list[dict]
 ) -> list[dict]:
@@ -416,7 +433,19 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
                     )
 
     try:
-        await run()
+        for attempt in range(_MAX_RATE_LIMIT_RETRIES + 1):
+            try:
+                await run()
+                break
+            except Exception as exc:
+                wait = _retry_after_seconds(exc)
+                if wait is None or attempt == _MAX_RATE_LIMIT_RETRIES:
+                    raise
+                logger.info(
+                    "analyze job %s hit a rate limit, retrying in %.1fs (attempt %d/%d)",
+                    job_id, wait, attempt + 1, _MAX_RATE_LIMIT_RETRIES,
+                )
+                await asyncio.sleep(wait + 0.5)
         final = await _session_service.get_session(
             app_name="ip_matchmaker", user_id="web", session_id=session.id
         )
