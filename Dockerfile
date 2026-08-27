@@ -17,4 +17,5 @@ COPY --from=frontend-builder /app/frontend/dist ./static
 ENV PORT=8080
 EXPOSE 8080
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Shell form so $PORT is expanded — hosts like Render assign their own port.
+CMD uvicorn main:app --host 0.0.0.0 --port ${PORT}

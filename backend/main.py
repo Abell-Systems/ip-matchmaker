@@ -30,7 +30,7 @@ from patent_agent.shared.state_keys import (  # noqa: E402
     SCORED_CANDIDATES,
 )
 from patent_agent.tools.bigquery_patents import get_patents_datasource  # noqa: E402
-from patent_agent.tools.clustering import cluster_patents  # noqa: E402
+from patent_agent.tools.clustering import cluster_patents, patents_for_demand_signal  # noqa: E402
 from patent_agent.tools.demand_sources import get_demand_datasource  # noqa: E402
 from patent_agent.tools.schemas import (  # noqa: E402
     AdversarialVerdict,
@@ -93,6 +93,30 @@ def get_landscape(
         "domain": domain,
         "patents": [r.model_dump() for r in records],
         "clusters": [c.model_dump() for c in clusters],
+    }
+
+
+@app.get("/api/demand/{signal_id}/patents")
+def get_patents_for_demand(
+    signal_id: str,
+    query: str = Query(min_length=1),
+    domain: str = Query(min_length=1),
+    max_results: int = Query(20, ge=1, le=100),
+) -> dict:
+    """Patents related to one demand signal (e.g. an Innoget technology call).
+
+    `query`/`domain` re-run the same demand search the signal_id came from
+    (demand signals aren't stored server-side, only returned from /api/landscape),
+    so this must be called with the same args used to find that signal_id.
+    """
+    demand_signals = get_demand_datasource().search_demand(query, domain)
+    signal = next((s for s in demand_signals if s.id == signal_id), None)
+    if signal is None:
+        raise HTTPException(status_code=404, detail=f"Demand signal '{signal_id}' not found for that query/domain")
+    records = patents_for_demand_signal(signal, domain, max_results)
+    return {
+        "demand_signal": signal.model_dump(),
+        "patents": [r.model_dump() for r in records],
     }
 
 

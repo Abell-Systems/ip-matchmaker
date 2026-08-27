@@ -119,6 +119,25 @@ def cluster_patents(
     return clusters
 
 
+def patents_for_demand_signal(
+    signal: DemandSignal, domain: str, max_results: int = 20
+) -> list[PatentRecord]:
+    """Find patents related to one demand signal (e.g. an Innoget technology call).
+
+    Searches patents by the signal's title, then narrows to the same CPC prefix
+    when that yields any hits (falls back to the unfiltered search otherwise —
+    the demand source's CPC classification is a heuristic, not exact).
+    """
+    from .bigquery_patents import get_patents_datasource
+
+    records = get_patents_datasource().search_patents(signal.title, domain, max_results)
+    if signal.cpc_prefix:
+        matched = [r for r in records if _primary_prefix(r) == signal.cpc_prefix]
+        if matched:
+            return matched
+    return records
+
+
 def cluster_patents_tool(query: str, domain: str, max_results: int = 20) -> list[dict]:
     """Search patents for a domain and cluster them into white-space vs. saturated areas.
 
