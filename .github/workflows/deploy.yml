@@ -26,20 +26,24 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v2
 
       - name: Deploy to Cloud Run
+        env:
+          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          REGION: ${{ secrets.GCP_REGION || 'us-central1' }}
         run: |
-          PROJECT_ID="${{ secrets.GCP_PROJECT_ID }}"
           if [ -z "$PROJECT_ID" ]; then
-            PROJECT_ID="ip-matchmaker-506820"
+            echo "ERROR: GCP_PROJECT_ID secret is required."
+            exit 1
           fi
 
           gcloud run deploy patent-agent \
             --source . \
             --project "$PROJECT_ID" \
-            --region us-central1 \
+            --region "$REGION" \
             --allow-unauthenticated \
             --memory 2Gi \
             --cpu 2 \
             --timeout 600s \
             --quiet \
             --set-env-vars "MODEL_PROVIDER=gemini,GEMINI_MODEL=gemini-2.5-flash,GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_LOCATION=us-central1,USE_MOCK_BIGQUERY=true"
+
 
