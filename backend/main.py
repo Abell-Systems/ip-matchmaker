@@ -10,34 +10,38 @@ import logging
 import os
 import re
 import uuid
+from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from datetime import datetime, timezone
-
 from fastapi import HTTPException, Query  # noqa: E402
-from google.adk.agents import LoopAgent, SequentialAgent  # noqa: E402
+from fastapi.responses import FileResponse  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
 from google.adk.cli.fast_api import get_fast_api_app  # noqa: E402
 from google.adk.runners import Runner  # noqa: E402
 from google.adk.sessions import InMemorySessionService  # noqa: E402
 from google.genai import types  # noqa: E402
 from pydantic import BaseModel, Field, ValidationError  # noqa: E402
 
-from patent_agent.config import INVENTION_LOOP_MAX_ITERATIONS  # noqa: E402
+from patent_agent.agent import build_invention_pipeline  # noqa: E402
+from patent_agent.provider import LLMProvider  # noqa: E402
+from patent_agent.services.research_service import get_research_service  # noqa: E402
+from patent_agent.shared.job_store import get_job_store  # noqa: E402
+from patent_agent.shared.provider_policy import (  # noqa: E402
+    ProviderPacingPlugin,
+    get_execution_policy,
+)
 from patent_agent.shared.state_keys import (  # noqa: E402
     ADVERSARIAL_VERDICTS,
     CANDIDATE_INVENTIONS,
     SCORED_CANDIDATES,
     SELECTED_CLUSTER_CONTEXT,
 )
-from patent_agent.sub_agents.adversarial.agent import build_adversarial_agent  # noqa: E402
-from patent_agent.sub_agents.governor.agent import build_governor_agent  # noqa: E402
-from patent_agent.sub_agents.inventor.agent import build_inventor_agent  # noqa: E402
+from patent_agent.shared.telemetry import PipelineProfiler  # noqa: E402
 from patent_agent.tools.bigquery_patents import get_patents_datasource  # noqa: E402
-from patent_agent.tools.clustering import cluster_patents, patents_for_demand_signal  # noqa: E402
-from patent_agent.tools.context import build_cluster_context  # noqa: E402
+from patent_agent.tools.clustering import patents_for_demand_signal  # noqa: E402
 from patent_agent.tools.demand_sources import get_demand_datasource  # noqa: E402
 from patent_agent.tools.schemas import (  # noqa: E402
     AdversarialVerdict,
@@ -48,9 +52,6 @@ from patent_agent.tools.schemas import (  # noqa: E402
 )
 
 logger = logging.getLogger(__name__)
-
-# reuse the free-tier pacing plugin; do not add a second rate limiter anywhere
-from run_pipeline import RateLimiter  # noqa: E402
 
 AGENTS_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -66,11 +67,43 @@ app = get_fast_api_app(
     allow_origins=_ALLOWED_ORIGINS,
 )
 
-
 app.router.routes = [r for r in app.router.routes if getattr(r, "path", None) != "/health"]
 
+_research_service = get_research_service()
+_job_store = get_job_store()
+_execution_policy = get_execution_policy()
+_rate_limiter = ProviderPacingPlugin(policy=_execution_policy.provider_policy)
+_session_service = InMemorySessionService()
 
-from patent_agent.provider import LLMProvider  # noqa: E402
+# Backward compatibility references for tests/inspectors
+_jobs = getattr(_job_store, "_jobs", {})
+
+
+class _AnalyzeLockCompat:
+    @property
+    def _locked(self) -> bool:
+        return _execution_policy.is_busy()
+
+    @_locked.setter
+    def _locked(self, val: bool) -> None:
+        _execution_policy.active_runs = _execution_policy.max_concurrency if val else 0
+
+    def locked(self) -> bool:
+        return _execution_policy.is_busy()
+
+
+_analyze_lock = _AnalyzeLockCompat()
+
+_analyze_pipeline = build_invention_pipeline()
+_runner = Runner(
+    agent=_analyze_pipeline,
+    app_name="ip_matchmaker",
+    session_service=_session_service,
+    plugins=[_rate_limiter],
+)
+
+
+
 
 
 @app.get("/health")
@@ -91,25 +124,18 @@ def health() -> dict:
 
 
 @app.get("/api/landscape")
-def get_landscape(
+async def get_landscape(
     query: str = Query(min_length=1),
     domain: str = Query(min_length=1),
     max_results: int = Query(20, ge=1, le=100),
 ) -> dict:
-    """Deterministic, LLM-free view of the research + clustering pipeline.
-
-    Calls the same tools research_agent uses, without going through the ADK
-    Runner/Gemini — lets the "heavy lifting of massive datasets" part of the
-    pipeline be demoed and deployed before a Gemini API key is wired in.
-    """
-    records = get_patents_datasource().search_patents(query, domain, max_results)
-    demand_signals = get_demand_datasource().search_demand(query, domain)
-    clusters = cluster_patents(records, demand_signals)
+    """Deterministic view of the unified research + clustering pipeline."""
+    res = await _research_service.conduct_research(query=query, domain=domain, max_patents=max_results)
     return {
-        "query": query,
-        "domain": domain,
-        "patents": [r.model_dump() for r in records],
-        "clusters": [c.model_dump() for c in clusters],
+        "query": res.query,
+        "domain": res.domain,
+        "patents": [r.model_dump() for r in res.patents],
+        "clusters": [c.model_dump() for c in res.clusters],
     }
 
 
@@ -120,12 +146,7 @@ def get_patents_for_demand(
     domain: str = Query(min_length=1),
     max_results: int = Query(20, ge=1, le=100),
 ) -> dict:
-    """Patents related to one demand signal (e.g. an Innoget technology call).
-
-    `query`/`domain` re-run the same demand search the signal_id came from
-    (demand signals aren't stored server-side, only returned from /api/landscape),
-    so this must be called with the same args used to find that signal_id.
-    """
+    """Patents related to one demand signal (e.g. an Innoget technology call)."""
     demand_signals = get_demand_datasource().search_demand(query, domain)
     signal = next((s for s in demand_signals if s.id == signal_id), None)
     if signal is None:
@@ -137,33 +158,6 @@ def get_patents_for_demand(
     }
 
 
-# /api/analyze pre-mines patents/clusters deterministically in Python (see
-# _execute_analysis below) before ever touching the LLM, so this pipeline skips
-# research_agent entirely — asking it to re-mine via tool calls was pure
-# duplicate work and the single biggest source of prompt bloat (its own
-# multi-tool-call turn could exceed free-tier TPM caps on its own, regardless
-# of the include_contents fix on the agents below). The interactive `adk web`
-# graph (patent_agent/agent.py's root_agent) still includes research_agent —
-# it has no pre-mined data to seed from.
-_invention_loop = LoopAgent(
-    name="invention_loop",
-    sub_agents=[build_inventor_agent(), build_adversarial_agent()],
-    max_iterations=INVENTION_LOOP_MAX_ITERATIONS,
-)
-_analyze_pipeline = SequentialAgent(
-    name="patent_innovation_agent_api",
-    sub_agents=[_invention_loop, build_governor_agent()],
-)
-
-_session_service = InMemorySessionService()
-_runner = Runner(
-    agent=_analyze_pipeline,
-    app_name="ip_matchmaker",
-    session_service=_session_service,
-    plugins=[RateLimiter()],
-)
-
-
 class AnalyzeRequest(BaseModel):
     domain: str = Field(min_length=1)
     query: str = Field(default="solid electrolyte interphase")
@@ -171,11 +165,7 @@ class AnalyzeRequest(BaseModel):
 
 
 def _as_list(value) -> list:
-    """Normalize one state entry to a JSON-friendly list.
-
-    Structured-output agents store a dict (or its JSON string); the inventor
-    emits a single candidate; the adversarial agent still emits free text.
-    """
+    """Normalize one state entry to a JSON-friendly list."""
     if value is None:
         return []
     if isinstance(value, str):
@@ -192,28 +182,23 @@ def _as_list(value) -> list:
 
 
 def _validated(model_cls, items) -> list[dict]:
-    """Keep only entries that match the shared schema; drop the rest.
-
-    Agents occasionally emit free text or partial JSON; passing that through
-    verbatim crashes the frontend, which dereferences typed fields.
-    """
-    out: list[dict] = []
-    for item in _as_list(items):
+    """Keep only entries that match the shared schema; drop the rest."""
+    out = []
+    for item in items:
+        if isinstance(item, model_cls):
+            out.append(item.model_dump())
+            continue
+        if not isinstance(item, dict):
+            continue
         try:
-            out.append(model_cls.model_validate(item).model_dump())
+            out.append(model_cls(**item).model_dump())
         except ValidationError:
-            logger.warning("dropping malformed %s entry: %.120r", model_cls.__name__, item)
+            pass
     return out
 
 
-# One full-graph run at a time: it burns minutes of free-tier Gemini quota and
-# concurrent runs would serialize unpredictably on the RateLimiter plugin.
-_analyze_lock = asyncio.Lock()
-_ANALYZE_TIMEOUT_S = int(os.getenv("ANALYZE_TIMEOUT_SECONDS", "900"))
-
-# ponytail: in-memory job store — valid because deploys pin --max-instances=1
-# (see docs/deploy.md). Swap to Firestore only if multi-instance ever matters.
-_jobs: dict[str, dict] = {}
+# Cloud Run's request timeout default is 300s; keep the background loop bounded.
+_ANALYZE_TIMEOUT_S = 600.0
 
 
 def _emit_event(
@@ -221,13 +206,9 @@ def _emit_event(
     event_type: str,
     message: str,
     candidate_id: str | None = None,
-    evidence: dict | list | str | None = None,
+    evidence: dict | None = None,
 ) -> None:
-    if "events" not in _jobs.get(job_id, {}):
-        if job_id in _jobs:
-            _jobs[job_id]["events"] = []
-        else:
-            return
+    """Append a structured, typed event to the job's event log."""
     ts = datetime.now(timezone.utc).isoformat()
     evt = {
         "type": event_type,
@@ -238,13 +219,18 @@ def _emit_event(
         evt["candidateId"] = candidate_id
     if evidence is not None:
         evt["evidence"] = evidence
-    _jobs[job_id]["events"].append(evt)
+
+    if hasattr(_job_store, "_jobs") and job_id in getattr(_job_store, "_jobs", {}):
+        _job_store._jobs[job_id].setdefault("events", []).append(evt)
+    else:
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(_job_store.append_event(job_id, evt))
+        except RuntimeError:
+            asyncio.run(_job_store.append_event(job_id, evt))
 
 
-# Pre-flight token-budget pacing (RateLimiter) reduces how often Groq's TPM
-# cap gets hit, but it's an estimate, not a guarantee — actual usage varies
-# run to run. When it does get hit, Groq's own error names the exact wait
-# needed ("Please try again in 6.4875s"); honor that instead of guessing.
+
 _RETRY_AFTER_RE = re.compile(r"try again in ([\d.]+)(m?s)")
 _MAX_RATE_LIMIT_RETRIES = 3
 
@@ -280,39 +266,41 @@ def reconcile_candidate_verdicts(
 
 
 async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
-    """Runs the agent graph for one cluster; returns candidates/verdicts/scorecards."""
-    _jobs[job_id]["stage"] = "researching"
-    _jobs[job_id]["progress"] = {}
-    _jobs[job_id]["events"] = []
-    
-    records = get_patents_datasource().search_patents(req.query, req.domain, max_results=20)
-    demand_signals = get_demand_datasource().search_demand(req.query, req.domain)
-    _jobs[job_id]["progress"]["patentsAnalyzed"] = len(records)
+    """Runs unified research service + agent graph for one cluster."""
+    profiler = PipelineProfiler()
+    _rate_limiter.profiler = profiler
+
+    await _job_store.set_stage(job_id, "researching")
+
+    res = await _research_service.conduct_research(
+        query=req.query,
+        domain=req.domain,
+        cluster_id=req.cluster_id,
+        profiler=profiler,
+    )
+
+    await _job_store.update_progress(job_id, "patentsAnalyzed", len(res.patents))
     _emit_event(
         job_id,
         "research_completed",
-        f"Researched {len(records)} patents",
-        evidence={"patentsAnalyzed": len(records)},
+        f"Researched {len(res.patents)} patents",
+        evidence={"patentsAnalyzed": len(res.patents)},
     )
-    
-    _jobs[job_id]["stage"] = "clustering"
-    clusters = cluster_patents(records, demand_signals)
-    _jobs[job_id]["progress"]["clustersFound"] = len(clusters)
-    _jobs[job_id]["clusters"] = [c.model_dump() for c in clusters]
+
+    await _job_store.set_stage(job_id, "clustering")
+    await _job_store.update_progress(job_id, "clustersFound", len(res.clusters))
+    await _job_store.update_job(job_id, {"clusters": [c.model_dump() for c in res.clusters]})
     _emit_event(
         job_id,
         "landscape_clustered",
-        f"Found {len(clusters)} white-space opportunities",
-        evidence={"clustersFound": len(clusters)},
-    )
-    
-    cluster_id = req.cluster_id or (clusters[0].cluster_id if clusters else "unknown")
-    selected_cluster = next((c for c in clusters if c.cluster_id == cluster_id), None)
-    cluster_context = (
-        build_cluster_context(selected_cluster, records, demand_signals) if selected_cluster else ""
+        f"Found {len(res.clusters)} white-space opportunities",
+        evidence={"clustersFound": len(res.clusters)},
     )
 
-    _jobs[job_id]["stage"] = "inventing"
+    cluster_id = res.cluster_id
+    cluster_context = res.cluster_context
+
+    await _job_store.set_stage(job_id, "inventing")
 
     session = await _session_service.create_session(
         app_name="ip_matchmaker",
@@ -336,10 +324,10 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
                 app_name="ip_matchmaker", user_id="web", session_id=session.id
             )
             state = curr.state or {}
-            
+
             cands = _as_list(state.get(CANDIDATE_INVENTIONS))
             if cands:
-                _jobs[job_id]["progress"]["candidatesGenerated"] = len(cands)
+                await _job_store.update_progress(job_id, "candidatesGenerated", len(cands))
                 for cand in cands:
                     cand_id = "unknown"
                     cand_title = ""
@@ -361,10 +349,10 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
                             candidate_id=cand_id,
                             evidence=cand if isinstance(cand, (dict, list, str, int, float)) else str(cand),
                         )
-                
+
             verdicts = _as_list(state.get(ADVERSARIAL_VERDICTS))
             if verdicts:
-                _jobs[job_id]["stage"] = "adversarial"
+                await _job_store.set_stage(job_id, "adversarial")
                 rej = 0
                 surv = 0
                 rev = 0
@@ -383,7 +371,7 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
                             v_cand_id = str(v.get("candidate_id", "unknown"))
                             cited = v.get("cited_patents", [])
                             cited_str = f"Prior art: {', '.join(cited)}" if cited else ""
-                            
+
                             _emit_event(
                                 job_id,
                                 "candidate_challenged",
@@ -416,13 +404,13 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
                                     evidence=v,
                                 )
 
-                _jobs[job_id]["progress"]["candidatesRejected"] = rej
-                _jobs[job_id]["progress"]["candidatesRevised"] = rev
-                _jobs[job_id]["progress"]["candidatesSurvived"] = surv
-                
+                await _job_store.update_progress(job_id, "candidatesRejected", rej)
+                await _job_store.update_progress(job_id, "candidatesRevised", rev)
+                await _job_store.update_progress(job_id, "candidatesSurvived", surv)
+
             scores = _as_list(state.get(SCORED_CANDIDATES))
             if scores:
-                _jobs[job_id]["stage"] = "governor"
+                await _job_store.set_stage(job_id, "governor")
                 if not seen_assessment:
                     seen_assessment = True
                     _emit_event(
@@ -446,17 +434,23 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
                     job_id, wait, attempt + 1, _MAX_RATE_LIMIT_RETRIES,
                 )
                 await asyncio.sleep(wait + 0.5)
+
         final = await _session_service.get_session(
             app_name="ip_matchmaker", user_id="web", session_id=session.id
         )
         final_state = final.state or {}
         raw_verdicts = _validated(AdversarialVerdict, final_state.get(ADVERSARIAL_VERDICTS))
         raw_scorecards = _validated(ScoreCard, final_state.get(SCORED_CANDIDATES))
+
+        telemetry = profiler.get_summary()
+        await _job_store.update_job(job_id, {"telemetry_profile": telemetry})
+        profiler.print_profile()
+
         return {
             "candidates": _validated(InventionCandidate, final_state.get(CANDIDATE_INVENTIONS)),
             "verdicts": reconcile_candidate_verdicts(raw_verdicts, raw_scorecards),
             "scorecards": raw_scorecards,
-            "events": _jobs[job_id].get("events", []),
+            "telemetry_profile": telemetry,
         }
     finally:
         await _session_service.delete_session(
@@ -472,15 +466,7 @@ _QUOTA_FRIENDLY_MESSAGE = (
 
 
 def _classify_error(exc: Exception) -> dict:
-    """Map a raw exception to a user-facing error_type + message.
-
-    Gemini's free tier returns 429 RESOURCE_EXHAUSTED both for short-window
-    rate limits (retry-after seconds, fine to auto-retry) and for the daily
-    per-project/per-model request cap (retrying does nothing until the quota
-    resets). Only the daily-cap message names "PerDay" in its quotaId, so
-    that's the signal we key off — an immediate "Try again" is actively
-    misleading for that case.
-    """
+    """Map a raw exception to a user-facing error_type + message."""
     text = str(exc)
     if "RESOURCE_EXHAUSTED" in text and "PerDay" in text:
         return {"error_type": "quota_exhausted", "detail": _QUOTA_FRIENDLY_MESSAGE}
@@ -488,55 +474,36 @@ def _classify_error(exc: Exception) -> dict:
 
 
 async def _run_job(job_id: str, req: AnalyzeRequest) -> None:
-    async with _analyze_lock:
+    async with _execution_policy.acquire_execution_slot():
         try:
             result = await asyncio.wait_for(_execute_analysis(job_id, req), timeout=_ANALYZE_TIMEOUT_S)
-            _jobs[job_id] = {
-                "status": "done",
-                "stage": "done",
-                "events": _jobs[job_id].get("events", []),
-                **result,
-            }
+            await _job_store.set_result(job_id, result)
         except TimeoutError:
-            _jobs[job_id] = {
-                "status": "error",
-                "stage": "error",
-                "events": _jobs[job_id].get("events", []),
-                "error_type": "timeout",
-                "detail": f"Agent run exceeded {_ANALYZE_TIMEOUT_S}s.",
-            }
+            await _job_store.set_error(job_id, f"Agent run exceeded {_ANALYZE_TIMEOUT_S}s.")
+            await _job_store.update_job(job_id, {"error_type": "timeout", "detail": f"Agent run exceeded {_ANALYZE_TIMEOUT_S}s."})
         except Exception as exc:
             logger.exception("analyze job %s failed", job_id)
-            _jobs[job_id] = {
-                "status": "error",
-                "stage": "error",
-                "events": _jobs[job_id].get("events", []),
-                **_classify_error(exc),
-            }
-
+            err_info = _classify_error(exc)
+            await _job_store.set_error(job_id, err_info.get("detail", str(exc)))
+            await _job_store.update_job(job_id, err_info)
 
 
 @app.post("/api/analyze", status_code=202)
 async def analyze(req: AnalyzeRequest) -> dict:
-    """Kicks off the full agent graph (research -> inventor/adversarial loop ->
-    governor) in the background and returns a job id immediately. Poll
-    GET /api/analyze/{job_id}; only one run may be in flight at a time."""
-    if _analyze_lock.locked():
+    """Kicks off the unified research service + agent graph in the background and returns a job id immediately."""
+    if _execution_policy.is_busy():
         raise HTTPException(status_code=503, detail="An analyze run is already in progress.")
     job_id = uuid.uuid4().hex
-    _jobs[job_id] = {"status": "running", "stage": "queued"}
+    await _job_store.create_job(job_id, {"status": "running", "stage": "queued"})
     asyncio.create_task(_run_job(job_id, req))
     return {"job_id": job_id, "status": "running", "stage": "queued"}
 
-
-from fastapi.responses import FileResponse  # noqa: E402
-from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 
 @app.get("/api/analyze/{job_id}")
 async def analyze_status(job_id: str) -> dict:
     """Poll endpoint for a background analyze run."""
-    job = _jobs.get(job_id)
+    job = await _job_store.get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Unknown job id.")
     return job
@@ -589,5 +556,3 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8080")))
-
-

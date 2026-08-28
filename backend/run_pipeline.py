@@ -51,67 +51,9 @@ def show(label: str, value):
         print(json.dumps(value, indent=2, default=str)[:2000])
 
 
-class RateLimiter(BasePlugin):
-    """Paces model calls under two limits so free/preview tiers don't 429:
-    a minimum gap between calls (RPM-style, what this was originally written
-    for on Gemini's free tier) and a token budget over a trailing window
-    (TPM-style — Groq's qwen preview caps at 8K tokens/60s). A fixed inter-
-    call delay alone isn't enough for TPM caps: two calls individually under
-    budget can still sum past it within the same rolling window, which is
-    exactly what happened live on Groq. Tunable via env vars so a different
-    provider/tier doesn't need a code change.
-    """
+from patent_agent.shared.provider_policy import ProviderPacingPlugin, RateLimiter
+from patent_agent.shared.telemetry import PipelineProfiler
 
-    def __init__(self) -> None:
-        super().__init__(name="rate_limiter")
-        self._min_gap = float(os.getenv("RATE_LIMIT_MIN_GAP_SECONDS", "13"))
-        self._tpm_budget = int(os.getenv("RATE_LIMIT_TPM_BUDGET", "6000"))
-        self._window_seconds = float(os.getenv("RATE_LIMIT_TPM_WINDOW_SECONDS", "60"))
-        self._last_call = 0.0
-        self._calls: list[tuple[float, int]] = []  # (timestamp, estimated_tokens)
-
-    _SAFETY_PAD = 300  # ponytail: flat pad for the estimator's residual bias
-    # (live: 8079 actual vs an 8000 cap after switching to chars/3 — a ~1%
-    # miss, not a systemic one). This is still an estimate, not a guarantee;
-    # the robust version reads litellm's real usage_metadata per call and
-    # feeds that back into the window instead of trusting the pre-flight
-    # guess indefinitely — worth doing if a provider swap makes the request
-    # shape different enough to shift this bias again.
-
-    @staticmethod
-    def _estimate_tokens(llm_request) -> int:
-        """Rough token proxy over the request's contents/config. Uses chars/3,
-        not chars/4: live testing showed chars/4 underestimated actual usage
-        by ~30% — JSON-heavy tool schemas and structured output tokenize
-        denser than plain prose. Precise enough to pace calls, not to bill."""
-        try:
-            text = str(llm_request.contents) + str(llm_request.config)
-        except Exception:
-            return 2000  # conservative fallback if the request shape ever changes
-        return max(len(text) // 3, 1) + RateLimiter._SAFETY_PAD
-
-    async def before_model_callback(self, *, callback_context, llm_request):
-        now = time.monotonic()
-
-        gap_wait = self._last_call + self._min_gap - now
-        if gap_wait > 0:
-            await asyncio.sleep(gap_wait)
-            now = time.monotonic()
-
-        self._calls = [(t, tok) for t, tok in self._calls if now - t < self._window_seconds]
-        estimated = self._estimate_tokens(llm_request)
-        used = sum(tok for _, tok in self._calls)
-        if self._calls and used + estimated > self._tpm_budget:
-            budget_wait = self._window_seconds - (now - self._calls[0][0]) + 0.5
-            if budget_wait > 0:
-                print(f"  [rate-limit] pacing {budget_wait:.0f}s to stay under {self._tpm_budget} TPM...")
-                await asyncio.sleep(budget_wait)
-                now = time.monotonic()
-                self._calls = [(t, tok) for t, tok in self._calls if now - t < self._window_seconds]
-
-        self._last_call = now
-        self._calls.append((now, estimated))
-        return None
 
 
 async def main() -> None:
