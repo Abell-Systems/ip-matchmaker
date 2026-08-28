@@ -184,10 +184,15 @@ def _as_list(value) -> list:
 def _validated(model_cls, items) -> list[dict]:
     """Keep only entries that match the shared schema; drop the rest."""
     out = []
-    for item in items:
+    for item in _as_list(items):
         if isinstance(item, model_cls):
             out.append(item.model_dump())
             continue
+        if isinstance(item, str):
+            try:
+                item = json.loads(item)
+            except Exception:
+                continue
         if not isinstance(item, dict):
             continue
         try:
