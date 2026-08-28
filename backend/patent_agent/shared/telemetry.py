@@ -85,8 +85,9 @@ class PipelineProfiler:
         for s in self.spans:
             print(f"  [{s.category:<16}] {s.name:<30} : {s.duration_seconds:6.2f}s")
         print("-" * 60)
-        print(f"  Rate-Limit Artificial Wait (RPM gap) : {summary["rate_limit_gap_wait_seconds"]:6.2f}s")
-        print(f"  Rate-Limit Artificial Wait (TPM bud) : {summary["rate_limit_budget_wait_seconds"]:6.2f}s")
-        print(f"  Total Artificial Pacing Overhead     : {summary["rate_limit_total_wait_seconds"]:6.2f}s")
-        print(f"  Total Active Processing Time         : {summary["total_span_time_seconds"]:6.2f}s")
+        print(f"  Rate-Limit Artificial Wait (RPM gap) : {summary['rate_limit_gap_wait_seconds']:6.2f}s")
+        print(f"  Rate-Limit Artificial Wait (TPM bud) : {summary['rate_limit_budget_wait_seconds']:6.2f}s")
+        print(f"  Total Artificial Pacing Overhead     : {summary['rate_limit_total_wait_seconds']:6.2f}s")
+        print(f"  Total Active Processing Time         : {summary['total_span_time_seconds']:6.2f}s")
         print("=" * 60 + "\n")
+
