@@ -84,6 +84,8 @@ class ScoreCard(BaseModel):
     scope_drift: bool = False
     drift_reason: str = ""
     obviousness_risk: str = "low"
+    landscape_quality: str = "RELEVANT"
+    evaluation_verdict: str = "REJECTED_ON_PRIOR_ART"
 
 
 class ScoreCardList(BaseModel):
