@@ -126,7 +126,9 @@ class ProviderPacingPlugin(BasePlugin):
 
     @_min_gap.setter
     def _min_gap(self, val: float) -> None:
-        if hasattr(self.policy, "min_gap"):
+        if isinstance(self.policy, DirectProviderPolicy):
+            self.policy = GroqFreeTierPolicy(min_gap_seconds=val)
+        elif hasattr(self.policy, "min_gap"):
             self.policy.min_gap = val
 
     @property
@@ -135,7 +137,9 @@ class ProviderPacingPlugin(BasePlugin):
 
     @_tpm_budget.setter
     def _tpm_budget(self, val: int) -> None:
-        if hasattr(self.policy, "tpm_budget"):
+        if isinstance(self.policy, DirectProviderPolicy):
+            self.policy = GroqFreeTierPolicy(tpm_budget=val)
+        elif hasattr(self.policy, "tpm_budget"):
             self.policy.tpm_budget = val
 
     @property
@@ -144,7 +148,9 @@ class ProviderPacingPlugin(BasePlugin):
 
     @_window_seconds.setter
     def _window_seconds(self, val: float) -> None:
-        if hasattr(self.policy, "window_seconds"):
+        if isinstance(self.policy, DirectProviderPolicy):
+            self.policy = GroqFreeTierPolicy(window_seconds=val)
+        elif hasattr(self.policy, "window_seconds"):
             self.policy.window_seconds = val
 
     @property
@@ -155,6 +161,7 @@ class ProviderPacingPlugin(BasePlugin):
     def _calls(self, val: list[tuple[float, int]]) -> None:
         if hasattr(self.policy, "_calls"):
             self.policy._calls = val
+
 
     _SAFETY_PAD = 300
 
@@ -183,14 +190,11 @@ def get_execution_policy() -> ExecutionPolicy:
     global _default_execution_policy
     if _default_execution_policy is None:
         prov_policy = get_provider_policy()
-        provider = os.getenv("MODEL_PROVIDER", "groq").lower()
-        if provider == "groq" and os.getenv("GROQ_TIER", "free").lower() == "free":
-            max_conc = 1
-        else:
-            max_conc = int(os.getenv("MAX_CONCURRENCY", "10"))
+        max_conc = int(os.getenv("MAX_CONCURRENCY", "1"))
         _default_execution_policy = ExecutionPolicy(
             provider_policy=prov_policy,
             max_concurrency=max_conc,
         )
     return _default_execution_policy
+
 
