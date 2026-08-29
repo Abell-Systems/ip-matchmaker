@@ -85,9 +85,9 @@ _(link added Day 15)_
 
 ## Team
 
-- Backend / agents: _(fill in)_
+- Backend / agents: Abell Systems
 - UX / frontend: Lydia
 
 ## License
 
-_(fill in)_
+MIT — see [LICENSE](LICENSE).

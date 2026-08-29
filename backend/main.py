@@ -116,9 +116,14 @@ def health() -> dict:
             "model": "error",
             "error": str(err),
         }
+    try:
+        patents_datasource_status = get_patents_datasource().get_status()
+    except Exception as err:
+        patents_datasource_status = {"type": "unknown", "error": str(err)}
     return {
         "status": "ok",
         "use_mock_bigquery": os.getenv("USE_MOCK_BIGQUERY", "true"),
+        "patents_datasource": patents_datasource_status,
         **provider_status,
     }
 

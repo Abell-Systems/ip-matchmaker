@@ -20,8 +20,10 @@ gcloud run deploy patent-agent \
   --source . \
   --region us-central1 \
   --allow-unauthenticated \
-  --set-env-vars "GEMINI_API_KEY=<PASTE_KEY>,GEMINI_MODEL=gemini-3.5-flash,USE_MOCK_BIGQUERY=false"
+  --set-env-vars "GEMINI_API_KEY=<PASTE_KEY>,GEMINI_MODEL=gemini-3.5-flash,USE_MOCK_BIGQUERY=true"
 ```
+
+`USE_MOCK_BIGQUERY=true` here is deliberate, not a placeholder — see §2 below before changing it.
 
 Notes:
 - `--source .` uses the multi-stage `Dockerfile` at root to compile React (`npm run build`) and bundle it directly into FastAPI.
@@ -32,6 +34,26 @@ Notes:
 Smoke test:
 - Open `<cloud-run-url>` in browser to see User Zero UI.
 - Curl API: `curl "<cloud-run-url>/health"`
+
+## 2. BigQuery rollout status
+
+`USE_MOCK_BIGQUERY=false` is a deliberately staged rollout, not a single flag flip, because
+the risk here isn't BigQuery failing (the code already falls back to mock on any error) --
+it's BigQuery working too well and running up cost against a public, unauthenticated
+endpoint, or reporting as "real" data on a method that's still mocked underneath. The agreed
+sequence is:
+
+| Step | Status |
+|---|---|
+| Cost cap (`maximum_bytes_billed`, env-tunable) + in-process TTL cache on every real query | ✅ Done |
+| `get_patents_datasource()` memoized so the cache/client survive across requests | ✅ Done |
+| Observability: `/health` reports actual `patents_datasource` status (bigquery / bigquery_cached / mock_fallback), not just the config flag; `get_status()` lists which methods are genuinely real | ✅ Done |
+| `get_citations` wired to a real query (self-joins `patents-public-data.patents.publications`'s own `citation` field) | ✅ Done |
+| `get_similar_patents` real query (needs `google_patents_research.publications`'s precomputed similarity fields — separate table, separate cost profile) | Not started, not blocking |
+| IAM: grant the **Cloud Run runtime service account** (not the deploy-time workload-identity principal in `deploy.yml` -- confirm the actual runtime SA identity for this project first, don't assume it's the default compute SA) `roles/bigquery.jobUser` | ⛔ Not started |
+| Real-credentials integration test (currently `test_bigquery_real.py` only exercises the mocked-client fallback path) | ⛔ Not started |
+| Dry-run against the live public dataset to measure actual bytes scanned and sanity-check the `BIGQUERY_MAX_BYTES_BILLED` default | ⛔ Not started |
+| Flip `USE_MOCK_BIGQUERY=false` in `.github/workflows/deploy.yml` | ⛔ **Blocked pending review** -- do not flip until IAM → integration test → dry-run have each landed and been checked, in that order |
 
 ## 3. Quota & Cost Reality Check
 
