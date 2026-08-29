@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 # fallback-to-mock handling below -- never a 500, just degraded data.
 _DEFAULT_MAX_BYTES_BILLED = 1_000_000_000  # 1 GB; tune after a real dry-run (see docs/deploy.md)
 _DEFAULT_CACHE_TTL_SECONDS = 3600.0
+_CITATIONS_LIMIT = 20  # get_citations has no caller-supplied max_results; matches search's default
 
 
 def _max_bytes_billed() -> int:
@@ -105,6 +106,7 @@ class BigQueryPatentsDataSource:
         self._mock_fallback = MockPatentsDataSource()
         self._search_cache = _TTLCache(_cache_ttl_seconds())
         self._patent_cache = _TTLCache(_cache_ttl_seconds())
+        self._citations_cache = _TTLCache(_cache_ttl_seconds())
         # Set on every call so /health can report whether the last request actually
         # reached BigQuery or silently degraded to mock data.
         self.last_result_source = "not_yet_queried"
@@ -228,12 +230,60 @@ class BigQueryPatentsDataSource:
             return self._mock_fallback.get_patent_by_number(publication_number)
 
     def get_citations(self, publication_number: str) -> list[PatentRecord]:
-        # Not yet wired to a real BigQuery query -- always mock. See get_status()
-        # and docs/deploy.md: don't let USE_MOCK_BIGQUERY=false imply this is real.
-        return self._mock_fallback.get_citations(publication_number)
+        cached = self._citations_cache.get(publication_number)
+        if cached is not _MISSING:
+            self.last_result_source = "bigquery_cached"
+            return cached
+
+        try:
+            from google.cloud import bigquery
+
+            # `citation` is a repeated field already present on every publications
+            # row (patents-public-data's own schema) -- self-join back onto the
+            # same table to resolve each cited publication_number to a full
+            # record in one query, rather than one query per citation.
+            sql = """
+                SELECT
+                    cited.publication_number AS publication_number,
+                    cited.title_localized[SAFE_OFFSET(0)].text AS title,
+                    cited.abstract_localized[SAFE_OFFSET(0)].text AS abstract,
+                    ARRAY(SELECT code FROM UNNEST(cited.cpc)) AS cpc_codes,
+                    ARRAY(SELECT name FROM UNNEST(cited.assignee_harmonized)) AS assignee,
+                    CAST(cited.filing_date AS STRING) AS filing_date,
+                    CAST(cited.publication_date AS STRING) AS publication_date,
+                    cited.country_code AS country_code
+                FROM `patents-public-data.patents.publications` AS src,
+                UNNEST(src.citation) AS cite
+                JOIN `patents-public-data.patents.publications` AS cited
+                    ON cited.publication_number = cite.publication_number
+                WHERE src.publication_number = @pub_num
+                LIMIT @max_results
+            """
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("pub_num", "STRING", publication_number),
+                    bigquery.ScalarQueryParameter("max_results", "INT64", _CITATIONS_LIMIT),
+                ],
+                maximum_bytes_billed=_max_bytes_billed(),
+            )
+            results = list(self._client.query(sql, job_config=job_config).result())
+            if not results:
+                self.last_result_source = "mock_fallback"
+                return self._mock_fallback.get_citations(publication_number)
+
+            records = [self._row_to_patent_record(r) for r in results]
+            self.last_result_source = "bigquery"
+            self._citations_cache.set(publication_number, records)
+            return records
+        except Exception as exc:
+            logger.warning("BigQuery get_citations failed (%s); falling back to Mock.", exc)
+            self.last_result_source = "mock_fallback"
+            return self._mock_fallback.get_citations(publication_number)
 
     def get_similar_patents(self, publication_number: str, max_results: int = 10) -> list[PatentRecord]:
         # Not yet wired to a real BigQuery query -- always mock. See get_status().
+        # Unlike citations, real similarity needs google_patents_research.publications'
+        # precomputed embedding/similarity fields -- a second table, held for later.
         return self._mock_fallback.get_similar_patents(publication_number, max_results)
 
     def get_status(self) -> dict:
@@ -242,7 +292,7 @@ class BigQueryPatentsDataSource:
             "last_query_source": self.last_result_source,
             "search_patents_backed_by": "bigquery",
             "get_patent_by_number_backed_by": "bigquery",
-            "get_citations_backed_by": "mock",
+            "get_citations_backed_by": "bigquery",
             "get_similar_patents_backed_by": "mock",
         }
 

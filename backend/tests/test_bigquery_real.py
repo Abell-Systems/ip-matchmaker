@@ -116,9 +116,44 @@ def test_bigquery_get_status_reports_mock_only_methods():
     ds = BigQueryPatentsDataSource(project="test-project")
     status = ds.get_status()
     assert status["type"] == "bigquery"
-    assert status["get_citations_backed_by"] == "mock"
-    assert status["get_similar_patents_backed_by"] == "mock"
+    assert status["get_citations_backed_by"] == "bigquery"
+    assert status["get_similar_patents_backed_by"] == "mock"  # not wired yet -- see get_similar_patents
     assert status["search_patents_backed_by"] == "bigquery"
+
+
+def test_bigquery_get_citations_sets_maximum_bytes_billed_and_self_joins(monkeypatch):
+    monkeypatch.setenv("BIGQUERY_MAX_BYTES_BILLED", "654321")
+    ds = BigQueryPatentsDataSource(project="test-project")
+    ds._client = MagicMock()
+    ds._client.query.return_value = _fake_query_result(
+        [_fake_row(publication_number="US-2", title="cited t", abstract="cited a", cpc_codes=[], assignee=[],
+                    filing_date="2020-01-01", publication_date="2020-06-01", country_code="US")]
+    )
+
+    citations = ds.get_citations("US-1234567-A")
+
+    assert len(citations) == 1
+    assert citations[0].publication_number == "US-2"
+    assert ds.last_result_source == "bigquery"
+
+    sql, kwargs = ds._client.query.call_args[0][0], ds._client.query.call_args[1]
+    assert "UNNEST(src.citation)" in sql
+    assert kwargs["job_config"].maximum_bytes_billed == 654321
+
+
+def test_bigquery_get_citations_caches():
+    ds = BigQueryPatentsDataSource(project="test-project")
+    ds._client = MagicMock()
+    ds._client.query.return_value = _fake_query_result(
+        [_fake_row(publication_number="US-2", title="cited t", abstract="cited a", cpc_codes=[], assignee=[],
+                    filing_date="2020-01-01", publication_date="2020-06-01", country_code="US")]
+    )
+
+    ds.get_citations("US-1234567-A")
+    ds.get_citations("US-1234567-A")
+
+    assert ds._client.query.call_count == 1
+    assert ds.last_result_source == "bigquery_cached"
 
 
 def test_mock_datasource_get_status():
