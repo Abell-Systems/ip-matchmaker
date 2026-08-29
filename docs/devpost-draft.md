@@ -111,4 +111,4 @@ npm run dev
 - [x] **Hackathon Track**: **Taskmaster**.
 - [x] **Gemini requirement**: Configured with `gemini-3.5-flash`.
 - [x] **Google Agent Framework requirement**: Built natively with Google ADK (`SequentialAgent`, `LoopAgent`, `LlmAgent`).
-- [x] **Google Cloud Infrastructure requirement**: Deployed on Cloud Run + BigQuery.
+- [x] **Google Cloud Infrastructure requirement**: Deployed on Cloud Run. BigQuery data-source code is implemented and tested (`BigQueryPatentsDataSource`) but the live deploy currently runs `USE_MOCK_BIGQUERY=true`; flip to `false` once the deploying service account has confirmed BigQuery access to the public patents dataset.
