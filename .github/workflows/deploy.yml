@@ -6,6 +6,12 @@ on:
     types: [completed]
     branches: [main]
 
+# Never deploy multiple revisions from a burst of CI completions.
+# A newer deploy run cancels any older in-progress deploy for main.
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
 jobs:
   deploy:
     if: github.event.workflow_run.conclusion == 'success'
