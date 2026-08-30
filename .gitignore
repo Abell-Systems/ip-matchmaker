@@ -20,6 +20,10 @@ frontend/.env
 # --- Logs ---
 *.log
 
+# --- Ad-hoc validation/judge result dumps ---
+backend/*_results.json
+backend/*judge_results.json
+
 # --- OS / IDE ---
 .DS_Store
 .vscode/

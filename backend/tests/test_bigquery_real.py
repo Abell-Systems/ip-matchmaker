@@ -121,7 +121,7 @@ def test_bigquery_get_status_reports_mock_only_methods():
     assert status["search_patents_backed_by"] == "bigquery"
 
 
-def test_bigquery_get_citations_sets_maximum_bytes_billed_and_self_joins(monkeypatch):
+def test_bigquery_get_citations_sets_maximum_bytes_billed_and_reads_domain_index(monkeypatch):
     monkeypatch.setenv("BIGQUERY_MAX_BYTES_BILLED", "654321")
     ds = BigQueryPatentsDataSource(project="test-project")
     ds._client = MagicMock()
@@ -137,7 +137,8 @@ def test_bigquery_get_citations_sets_maximum_bytes_billed_and_self_joins(monkeyp
     assert ds.last_result_source == "bigquery"
 
     sql, kwargs = ds._client.query.call_args[0][0], ds._client.query.call_args[1]
-    assert "UNNEST(src.citation)" in sql
+    assert "UNNEST(src.citations)" in sql
+    assert bqp.DOMAIN_INDEX_TABLE in sql
     assert kwargs["job_config"].maximum_bytes_billed == 654321
 
 

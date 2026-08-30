@@ -128,10 +128,22 @@ class LLMProvider:
 
     @classmethod
     def is_api_key_configured(cls) -> bool:
-        """Checks if an API key environment variable is present for the active provider."""
+        """Checks if credentials are present for the active provider.
+
+        Gemini via Vertex AI (GOOGLE_GENAI_USE_VERTEXAI=true) authenticates with
+        the runtime's Application Default Credentials, not an API key -- reporting
+        `false` there would be a false negative on Cloud Run, which always runs
+        in that mode.
+        """
         if bool(os.getenv("MODEL_KEY")):
             return True
         provider = cls.get_provider_name()
+        if (
+            provider == "gemini"
+            and os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "").lower() == "true"
+            and os.getenv("GOOGLE_CLOUD_PROJECT")
+        ):
+            return True
         env_vars = API_KEY_ENV_VARS.get(provider, [f"{provider.upper()}_API_KEY"])
         return any(bool(os.getenv(var)) for var in env_vars)
 

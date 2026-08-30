@@ -64,6 +64,17 @@ def test_model_key_synchronization(monkeypatch):
     assert os.getenv("GROQ_API_KEY") == "gsk_test_key_12345"
 
 
+def test_vertex_mode_counts_as_api_key_configured(monkeypatch):
+    monkeypatch.setenv("MODEL_PROVIDER", "gemini")
+    monkeypatch.setenv("GOOGLE_GENAI_USE_VERTEXAI", "true")
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "ip-matchmaker-506820")
+    monkeypatch.delenv("MODEL_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+
+    assert LLMProvider.is_api_key_configured() is True
+
+
 def test_unsupported_provider_fails_fast(monkeypatch):
     monkeypatch.setenv("MODEL_PROVIDER", "unsupported_provider_xyz")
 

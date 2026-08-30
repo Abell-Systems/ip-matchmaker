@@ -15,13 +15,21 @@ from .schemas import PatentRecord
 
 logger = logging.getLogger(__name__)
 
-# patents-public-data.patents.publications is multi-terabyte; /api/landscape is a
-# public, unauthenticated endpoint, so every query needs a hard cost ceiling. A
-# breached cap raises before billing anything and is caught by the existing
-# fallback-to-mock handling below -- never a 500, just degraded data.
-_DEFAULT_MAX_BYTES_BILLED = 1_000_000_000  # 1 GB; tune after a real dry-run (see docs/deploy.md)
+# Querying patents-public-data directly (multi-TB, no partitioning/clustering)
+# cost ~150-250 GB *per call* regardless of how selective the WHERE clause is --
+# an agent loop calling get_patent_by_number/get_citations a few times would
+# scan a public, unauthenticated endpoint's way into real money. Instead, all
+# three methods below read a small materialized index (see DOMAIN_INDEX_TABLE)
+# built once by docs/deploy.md's `bq` ETL, scoped to the locked demo domain and
+# clustered by publication_number -- typical query cost is now ~10-15 MB, not
+# GB. The public dataset is an ingestion source for that one-time build, not
+# something the running app queries. This cap is now a genuine airbag against
+# a runaway query, not the operating budget.
+_DEFAULT_MAX_BYTES_BILLED = 500_000_000  # 500 MB
 _DEFAULT_CACHE_TTL_SECONDS = 3600.0
 _CITATIONS_LIMIT = 20  # get_citations has no caller-supplied max_results; matches search's default
+
+DOMAIN_INDEX_TABLE = "ip-matchmaker-506820.patent_agent_index.domain_index"
 
 
 def _max_bytes_billed() -> int:
@@ -147,20 +155,15 @@ class BigQueryPatentsDataSource:
         try:
             from google.cloud import bigquery
 
-            sql = """
-                SELECT
-                    publication_number,
-                    title_localized[SAFE_OFFSET(0)].text AS title,
-                    abstract_localized[SAFE_OFFSET(0)].text AS abstract,
-                    ARRAY(SELECT code FROM UNNEST(cpc)) AS cpc_codes,
-                    ARRAY(SELECT name FROM UNNEST(assignee_harmonized)) AS assignee,
-                    CAST(filing_date AS STRING) AS filing_date,
-                    CAST(publication_date AS STRING) AS publication_date,
-                    country_code
-                FROM `patents-public-data.patents.publications`
-                WHERE (LOWER(title_localized[SAFE_OFFSET(0)].text) LIKE LOWER(@query_param)
-                   OR LOWER(abstract_localized[SAFE_OFFSET(0)].text) LIKE LOWER(@query_param))
-                  AND country_code = 'US'
+            # Reads DOMAIN_INDEX_TABLE (see module docstring) instead of the
+            # public multi-TB tables -- clustered by publication_number, already
+            # scoped to the locked demo domain, so this scans MB not GB.
+            sql = f"""
+                SELECT publication_number, title, abstract, cpc_codes, country_code,
+                       assignee, filing_date, publication_date
+                FROM `{DOMAIN_INDEX_TABLE}`
+                WHERE LOWER(title) LIKE LOWER(@query_param)
+                   OR LOWER(abstract) LIKE LOWER(@query_param)
                 ORDER BY publication_date DESC
                 LIMIT @max_results
             """
@@ -195,17 +198,13 @@ class BigQueryPatentsDataSource:
         try:
             from google.cloud import bigquery
 
-            sql = """
-                SELECT
-                    publication_number,
-                    title_localized[SAFE_OFFSET(0)].text AS title,
-                    abstract_localized[SAFE_OFFSET(0)].text AS abstract,
-                    ARRAY(SELECT code FROM UNNEST(cpc)) AS cpc_codes,
-                    ARRAY(SELECT name FROM UNNEST(assignee_harmonized)) AS assignee,
-                    CAST(filing_date AS STRING) AS filing_date,
-                    CAST(publication_date AS STRING) AS publication_date,
-                    country_code
-                FROM `patents-public-data.patents.publications`
+            # Reads DOMAIN_INDEX_TABLE -- clustered by publication_number, so a
+            # point lookup here is a genuine cheap index seek, unlike the public
+            # tables (see module docstring).
+            sql = f"""
+                SELECT publication_number, title, abstract, cpc_codes, country_code,
+                       assignee, filing_date, publication_date
+                FROM `{DOMAIN_INDEX_TABLE}`
                 WHERE publication_number = @pub_num
                 LIMIT 1
             """
@@ -238,25 +237,21 @@ class BigQueryPatentsDataSource:
         try:
             from google.cloud import bigquery
 
-            # `citation` is a repeated field already present on every publications
-            # row (patents-public-data's own schema) -- self-join back onto the
-            # same table to resolve each cited publication_number to a full
-            # record in one query, rather than one query per citation.
-            sql = """
-                SELECT
-                    cited.publication_number AS publication_number,
-                    cited.title_localized[SAFE_OFFSET(0)].text AS title,
-                    cited.abstract_localized[SAFE_OFFSET(0)].text AS abstract,
-                    ARRAY(SELECT code FROM UNNEST(cited.cpc)) AS cpc_codes,
-                    ARRAY(SELECT name FROM UNNEST(cited.assignee_harmonized)) AS assignee,
-                    CAST(cited.filing_date AS STRING) AS filing_date,
-                    CAST(cited.publication_date AS STRING) AS publication_date,
-                    cited.country_code AS country_code
-                FROM `patents-public-data.patents.publications` AS src,
-                UNNEST(src.citation) AS cite
-                JOIN `patents-public-data.patents.publications` AS cited
-                    ON cited.publication_number = cite.publication_number
-                WHERE src.publication_number = @pub_num
+            # `citations` was pre-resolved into DOMAIN_INDEX_TABLE at build time
+            # (see the ETL in docs/deploy.md). Citations pointing outside the
+            # locked demo domain won't resolve here -- by design: the public
+            # dataset is an ingestion source, not something the running app
+            # queries (see module docstring), so an out-of-domain citation is
+            # dropped rather than triggering a fresh multi-GB public lookup.
+            sql = f"""
+                WITH src AS (
+                    SELECT citations FROM `{DOMAIN_INDEX_TABLE}`
+                    WHERE publication_number = @pub_num
+                )
+                SELECT d.publication_number, d.title, d.abstract, d.cpc_codes,
+                       d.country_code, d.assignee, d.filing_date, d.publication_date
+                FROM src, UNNEST(src.citations) AS cited_pub
+                JOIN `{DOMAIN_INDEX_TABLE}` d ON d.publication_number = cited_pub
                 LIMIT @max_results
             """
             job_config = bigquery.QueryJobConfig(
