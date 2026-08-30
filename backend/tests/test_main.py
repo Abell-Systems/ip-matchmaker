@@ -53,6 +53,24 @@ def test_validated_drops_malformed_entries():
     assert out == [good]
 
 
+def test_validated_recovers_json_wrapped_in_prose_or_fence():
+    from main import _validated
+    from patent_agent.tools.schemas import AdversarialVerdict
+
+    good = {
+        "candidate_id": "c1",
+        "verdict": "rejected",
+        "rationale": "anticipated",
+        "cited_patents": ["US-1"],
+    }
+    fenced = f"Here is my verdict:\n```json\n{__import__('json').dumps(good)}\n```\nThanks."
+    prose_wrapped = f"### Verdict\nSome commentary before. {__import__('json').dumps(good)} and after."
+    pure_prose_no_json = "### Verdict\n**Rejected** — no anticipating prior art was cited."
+
+    out = _validated(AdversarialVerdict, [fenced, prose_wrapped, pure_prose_no_json])
+    assert out == [good, good]
+
+
 def test_landscape_rejects_invalid_params():
     assert client.get("/api/landscape", params={"query": "", "domain": "d"}).status_code == 422
     assert client.get("/api/landscape", params={"query": "q", "domain": ""}).status_code == 422

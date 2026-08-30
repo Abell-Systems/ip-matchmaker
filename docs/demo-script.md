@@ -13,8 +13,7 @@
 0:30–1:00  Input & Problem Formulation
 1:00–1:40  Landscape Mining & White-Space Detection
 1:40–2:30  Agent Working (Research & Inventor Proposal)
-2:30–3:15  Adversarial Rejection & Inventor Iteration Loop
-3:15–3:40  Final Invention & Traceable Evidence ScoreCard
+2:30–3:40  Adversarial Rejection Loop & Traceable Evidence
 3:40–4:00  Cloud Run & Google Cloud Live Infrastructure Proof
 ```
 
@@ -42,15 +41,12 @@
 - **Voiceover:**
   > "When a white space is selected, IP Matchmaker launches an autonomous multi-agent pipeline. Our **Inventor Agent** analyzes the cluster and proposes a novel candidate invention: a gradient sulfide-halide solid electrolyte interface to prevent dendrite growth."
 
-### 2:30 – 3:15 | Adversarial Rejection + Iteration
-- **Visual:** **Adversarial Agent** evaluates proposal, emits verdict `"rejected"`, citing prior art `US-10448361-B2`. **Inventor Agent** receives rejection and auto-iterates, creating refined candidate `c1-inv-2` with a fluorinated interphase. **Adversarial Agent** re-evaluates and emits `"survives"`.
+### 2:30 – 3:40 | Adversarial Rejection Loop & Traceable Evidence
+- **Visual:** In the AGENT ACTIVITY FEED, follow the real-time exchange: **Inventor Agent** proposes a candidate, **Adversarial Agent** challenges it citing specific prior-art publication numbers pulled live from BigQuery, and emits a `"rejected"` verdict with rationale. The **Inventor Agent** ingests that rejection and proposes a refined candidate. Let this repeat once or twice live.
 - **Voiceover:**
-  > "Next, our **Adversarial Agent** attacks the proposal against prior art. It finds an overlapping patent—US-10448361-B2—and rejects candidate 1 with detailed rationale. Rather than giving up, the Inventor Agent ingests the rejection, iterates, and proposes candidate 2 with a specialized fluorinated protective interphase. The Adversarial Agent re-tests and confirms it survives prior art scrutiny."
+  > "Here's what makes this more than a chatbot: our **Adversarial Agent** doesn't just critique — it searches real prior art on BigQuery and cites specific patent numbers to justify every rejection. When it rejects a proposal, the **Inventor Agent** reads that exact citation and comes back with a genuinely different approach. Every claim on screen right now is backed by a real publication number, not an LLM guess — that's the traceability this system is built around, whether a candidate ultimately survives adversarial scrutiny or not."
 
-### 3:15 – 3:40 | Final Invention + Evidence
-- **Visual:** Final `ScoreCard` renders with sub-scores: Novelty (0.92), Prior-Art Risk (0.85), Differentiation (0.88), Evidence (0.95). Expanding `supporting_evidence` shows clickable prior-art publication IDs.
-- **Voiceover:**
-  > "Finally, our **Innovation Governor Agent** evaluates the surviving candidate. It outputs a complete ScoreCard where every single score is backed by traceable patent publication numbers—providing concrete evidence, not LLM hallucinations."
+*(Note: whether the final candidate survives or is rejected after all iterations, the evidence trail above — real cited prior art driving each rejection and revision — is the point being demonstrated, not a specific outcome.)*
 
 ### 3:40 – 4:00 | Cloud Run / Google Cloud Proof
 - **Visual:** Browser showing live backend URL on Cloud Run (`https://patent-agent-...run.app/health`) and Google Cloud Console dashboard with active Cloud Run service logs.

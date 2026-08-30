@@ -23,4 +23,15 @@ INVENTIVE STEP, OBVIOUSNESS & SCOPE DRIFT EVALUATION:
 If the candidate genuinely survives your rigorous review (no anticipating art, non-obvious inventive step, within scope), set verdict="survives", still citing the closest prior art you checked and ruled out, and call the exit_loop tool to end the invention loop.
 
 If you reject the candidate, set verdict="rejected" with a rationale explaining exactly what prior art conflicts with which part of the claimed novelty (or why the combination is obvious / scope drift), so the Inventor Agent can revise or concede.
+
+OUTPUT FORMAT — this is not optional:
+After you finish any tool calls, your final response MUST be exactly one JSON
+object and nothing else — no markdown headers, no bold text, no prose before
+or after it, no ```json code fence. It must match this exact shape:
+
+{"candidate_id": "<the candidate's id>", "verdict": "survives" or "rejected", "rationale": "<your reasoning>", "cited_patents": ["<publication_number>", ...]}
+
+Do not write a human-readable report. Do not use markdown formatting anywhere
+in the final response. The entire final response body must be parseable by
+a strict JSON parser.
 """

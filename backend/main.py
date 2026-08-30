@@ -186,6 +186,20 @@ def _as_list(value) -> list:
     return list(value)
 
 
+def _extract_json_object(text: str) -> str | None:
+    """Best-effort recovery of a JSON object from text that isn't pure JSON --
+    e.g. wrapped in a ```json fence, or with stray prose around it (an LLM
+    without a schema-enforced output can ignore a "JSON only" instruction)."""
+    fence_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if fence_match:
+        return fence_match.group(1)
+    first = text.find("{")
+    last = text.rfind("}")
+    if first != -1 and last != -1 and last > first:
+        return text[first : last + 1]
+    return None
+
+
 def _validated(model_cls, items) -> list[dict]:
     """Keep only entries that match the shared schema; drop the rest."""
     out = []
@@ -196,9 +210,15 @@ def _validated(model_cls, items) -> list[dict]:
         if isinstance(item, str):
             try:
                 item = json.loads(item)
-            except Exception as exc:
-                logger.warning("_validated(%s): couldn't parse item as JSON (%s): %r", model_cls.__name__, exc, item[:300])
-                continue
+            except Exception:
+                extracted = _extract_json_object(item)
+                try:
+                    if extracted is None:
+                        raise ValueError("no JSON object found in text")
+                    item = json.loads(extracted)
+                except Exception as exc:
+                    logger.warning("_validated(%s): couldn't parse item as JSON (%s): %r", model_cls.__name__, exc, item[:300])
+                    continue
         if not isinstance(item, dict):
             logger.warning("_validated(%s): item is not a dict after parsing: %r", model_cls.__name__, item)
             continue
@@ -329,8 +349,22 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
     seen_verdict_indices: set[int] = set()
     seen_assessment = False
 
+    # ADK can leave session state empty on the *final* get_session() call even
+    # after a mid-run checkpoint saw real data: an LlmAgent with output_schema
+    # skips writing state_delta on a trailing empty streaming chunk (see
+    # google.adk.agents.llm_agent.LlmAgent.__maybe_save_output_to_state --
+    # "this is an empty final chunk of a stream. Do not attempt to parse it"),
+    # so a value set on an earlier chunk of the same turn can end up not
+    # persisted by the time we re-fetch. Track the latest non-empty snapshot
+    # of each state key here instead of trusting a fresh get_session() after
+    # the loop -- confirmed reproducing this against production three times
+    # in a row (see docs/roadmap.md open risks, 2026-08-30).
+    last_seen_candidates: list = []
+    last_seen_verdicts: list = []
+    last_seen_scores: list = []
+
     async def run() -> None:
-        nonlocal seen_assessment
+        nonlocal seen_assessment, last_seen_candidates, last_seen_verdicts, last_seen_scores
         async for _ in _runner.run_async(user_id="web", session_id=session.id, new_message=msg):
             curr = await _session_service.get_session(
                 app_name="ip_matchmaker", user_id="web", session_id=session.id
@@ -339,6 +373,7 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
 
             cands = _as_list(state.get(CANDIDATE_INVENTIONS))
             if cands:
+                last_seen_candidates = cands
                 await _job_store.update_progress(job_id, "candidatesGenerated", len(cands))
                 for cand in cands:
                     cand_id = "unknown"
@@ -364,6 +399,7 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
 
             verdicts = _as_list(state.get(ADVERSARIAL_VERDICTS))
             if verdicts:
+                last_seen_verdicts = verdicts
                 await _job_store.set_stage(job_id, "adversarial")
                 rej = 0
                 surv = 0
@@ -422,6 +458,7 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
 
             scores = _as_list(state.get(SCORED_CANDIDATES))
             if scores:
+                last_seen_scores = scores
                 await _job_store.set_stage(job_id, "governor")
                 if not seen_assessment:
                     seen_assessment = True
@@ -447,19 +484,30 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
                 )
                 await asyncio.sleep(wait + 0.5)
 
+        # Prefer the last non-empty snapshot seen during the run over a fresh
+        # get_session() call -- see the last_seen_* comment above `run()` for
+        # why the final session state can come back empty even though the
+        # data genuinely existed mid-run.
         final = await _session_service.get_session(
             app_name="ip_matchmaker", user_id="web", session_id=session.id
         )
         final_state = final.state or {}
-        raw_verdicts = _validated(AdversarialVerdict, final_state.get(ADVERSARIAL_VERDICTS))
-        raw_scorecards = _validated(ScoreCard, final_state.get(SCORED_CANDIDATES))
+        raw_candidates = _validated(InventionCandidate, last_seen_candidates) or _validated(
+            InventionCandidate, final_state.get(CANDIDATE_INVENTIONS)
+        )
+        raw_verdicts = _validated(AdversarialVerdict, last_seen_verdicts) or _validated(
+            AdversarialVerdict, final_state.get(ADVERSARIAL_VERDICTS)
+        )
+        raw_scorecards = _validated(ScoreCard, last_seen_scores) or _validated(
+            ScoreCard, final_state.get(SCORED_CANDIDATES)
+        )
 
         telemetry = profiler.get_summary()
         await _job_store.update_job(job_id, {"telemetry_profile": telemetry})
         profiler.print_profile()
 
         return {
-            "candidates": _validated(InventionCandidate, final_state.get(CANDIDATE_INVENTIONS)),
+            "candidates": raw_candidates,
             "verdicts": reconcile_candidate_verdicts(raw_verdicts, raw_scorecards),
             "scorecards": raw_scorecards,
             "telemetry_profile": telemetry,
