@@ -503,6 +503,18 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
             app_name="ip_matchmaker", user_id="web", session_id=session.id
         )
         final_state = final.state or {}
+        logger.warning(
+            "analyze job %s pre-return snapshot: last_seen_candidates=%r final_state[CANDIDATE_INVENTIONS]=%r "
+            "last_seen_verdicts=%r final_state[ADVERSARIAL_VERDICTS]=%r "
+            "last_seen_scores=%r final_state[SCORED_CANDIDATES]=%r",
+            job_id,
+            last_seen_candidates,
+            final_state.get(CANDIDATE_INVENTIONS),
+            last_seen_verdicts,
+            final_state.get(ADVERSARIAL_VERDICTS),
+            last_seen_scores,
+            final_state.get(SCORED_CANDIDATES),
+        )
         raw_candidates = last_seen_candidates or _validated(InventionCandidate, final_state.get(CANDIDATE_INVENTIONS))
         raw_verdicts = last_seen_verdicts or _validated(AdversarialVerdict, final_state.get(ADVERSARIAL_VERDICTS))
         raw_scorecards = last_seen_scores or _validated(ScoreCard, final_state.get(SCORED_CANDIDATES))
