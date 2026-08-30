@@ -196,14 +196,16 @@ def _validated(model_cls, items) -> list[dict]:
         if isinstance(item, str):
             try:
                 item = json.loads(item)
-            except Exception:
+            except Exception as exc:
+                logger.warning("_validated(%s): couldn't parse item as JSON (%s): %r", model_cls.__name__, exc, item[:300])
                 continue
         if not isinstance(item, dict):
+            logger.warning("_validated(%s): item is not a dict after parsing: %r", model_cls.__name__, item)
             continue
         try:
             out.append(model_cls(**item).model_dump())
-        except ValidationError:
-            pass
+        except ValidationError as exc:
+            logger.warning("_validated(%s): item failed schema validation: %s | item=%r", model_cls.__name__, exc, item)
     return out
 
 
