@@ -355,13 +355,16 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
     # google.adk.agents.llm_agent.LlmAgent.__maybe_save_output_to_state --
     # "this is an empty final chunk of a stream. Do not attempt to parse it"),
     # so a value set on an earlier chunk of the same turn can end up not
-    # persisted by the time we re-fetch. Track the latest non-empty snapshot
+    # persisted by the time we re-fetch. Track the latest *validated* snapshot
     # of each state key here instead of trusting a fresh get_session() after
     # the loop -- confirmed reproducing this against production three times
-    # in a row (see docs/roadmap.md open risks, 2026-08-30).
-    last_seen_candidates: list = []
-    last_seen_verdicts: list = []
-    last_seen_scores: list = []
+    # in a row (see docs/roadmap.md open risks, 2026-08-30). Deliberately keyed
+    # on "validates successfully", not "non-empty": a later loop iteration
+    # producing unparseable text (e.g. adversarial_agent without an
+    # output_schema) must not clobber an earlier good snapshot.
+    last_seen_candidates: list[dict] = []
+    last_seen_verdicts: list[dict] = []
+    last_seen_scores: list[dict] = []
 
     async def run() -> None:
         nonlocal seen_assessment, last_seen_candidates, last_seen_verdicts, last_seen_scores
@@ -373,7 +376,9 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
 
             cands = _as_list(state.get(CANDIDATE_INVENTIONS))
             if cands:
-                last_seen_candidates = cands
+                validated_cands = _validated(InventionCandidate, cands)
+                if validated_cands:
+                    last_seen_candidates = validated_cands
                 await _job_store.update_progress(job_id, "candidatesGenerated", len(cands))
                 for cand in cands:
                     cand_id = "unknown"
@@ -399,7 +404,9 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
 
             verdicts = _as_list(state.get(ADVERSARIAL_VERDICTS))
             if verdicts:
-                last_seen_verdicts = verdicts
+                validated_verdicts = _validated(AdversarialVerdict, verdicts)
+                if validated_verdicts:
+                    last_seen_verdicts = validated_verdicts
                 await _job_store.set_stage(job_id, "adversarial")
                 rej = 0
                 surv = 0
@@ -458,7 +465,9 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
 
             scores = _as_list(state.get(SCORED_CANDIDATES))
             if scores:
-                last_seen_scores = scores
+                validated_scores = _validated(ScoreCard, scores)
+                if validated_scores:
+                    last_seen_scores = validated_scores
                 await _job_store.set_stage(job_id, "governor")
                 if not seen_assessment:
                     seen_assessment = True
@@ -484,23 +493,19 @@ async def _execute_analysis(job_id: str, req: AnalyzeRequest) -> dict:
                 )
                 await asyncio.sleep(wait + 0.5)
 
-        # Prefer the last non-empty snapshot seen during the run over a fresh
+        # Prefer the last validated snapshot seen during the run over a fresh
         # get_session() call -- see the last_seen_* comment above `run()` for
         # why the final session state can come back empty even though the
-        # data genuinely existed mid-run.
+        # data genuinely existed mid-run. last_seen_* are already validated
+        # (list[dict]); fall back to a fresh fetch only if the run somehow
+        # never saw a valid snapshot of that key at all.
         final = await _session_service.get_session(
             app_name="ip_matchmaker", user_id="web", session_id=session.id
         )
         final_state = final.state or {}
-        raw_candidates = _validated(InventionCandidate, last_seen_candidates) or _validated(
-            InventionCandidate, final_state.get(CANDIDATE_INVENTIONS)
-        )
-        raw_verdicts = _validated(AdversarialVerdict, last_seen_verdicts) or _validated(
-            AdversarialVerdict, final_state.get(ADVERSARIAL_VERDICTS)
-        )
-        raw_scorecards = _validated(ScoreCard, last_seen_scores) or _validated(
-            ScoreCard, final_state.get(SCORED_CANDIDATES)
-        )
+        raw_candidates = last_seen_candidates or _validated(InventionCandidate, final_state.get(CANDIDATE_INVENTIONS))
+        raw_verdicts = last_seen_verdicts or _validated(AdversarialVerdict, final_state.get(ADVERSARIAL_VERDICTS))
+        raw_scorecards = last_seen_scores or _validated(ScoreCard, final_state.get(SCORED_CANDIDATES))
 
         telemetry = profiler.get_summary()
         await _job_store.update_job(job_id, {"telemetry_profile": telemetry})
