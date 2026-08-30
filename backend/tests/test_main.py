@@ -125,6 +125,36 @@ def test_analyze_status_unknown_job_is_404():
     assert client.get("/api/analyze/nope").status_code == 404
 
 
+def test_list_analyze_jobs_includes_domain_query_and_candidate_count(monkeypatch):
+    import asyncio
+    import time
+
+    import main
+
+    async def fake_execute(job_id, req):
+        await asyncio.sleep(0)
+        return {"candidates": [{"candidate_id": "c1"}], "verdicts": [], "scorecards": []}
+
+    monkeypatch.setattr(main, "_execute_analysis", fake_execute)
+    resp = client.post("/api/analyze", json={"query": "history-query", "domain": "history-domain"})
+    job_id = resp.json()["job_id"]
+
+    for _ in range(100):
+        if client.get(f"/api/analyze/{job_id}").json()["status"] != "running":
+            break
+        time.sleep(0.05)
+
+    listing = client.get("/api/analyze")
+    assert listing.status_code == 200
+    jobs = listing.json()["jobs"]
+    match = next(j for j in jobs if j["job_id"] == job_id)
+    assert match["domain"] == "history-domain"
+    assert match["query"] == "history-query"
+    assert match["status"] == "done"
+    assert match["candidate_count"] == 1
+    assert match["created_at"] is not None
+
+
 def test_analyze_rejects_concurrent_runs(monkeypatch):
     import asyncio
 

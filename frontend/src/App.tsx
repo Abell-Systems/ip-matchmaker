@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { getAnalyzeStatus, startAnalyze } from "./api/client";
+import { BrandHeader } from "./components/shared/BrandHeader";
+import styles from "./components/UserZero/ErrorView.module.css";
 import { ExecutionView } from "./components/UserZero/ExecutionView";
+import { HistoryView } from "./components/UserZero/HistoryView";
 import { LandingView } from "./components/UserZero/LandingView";
 import { ResultsView } from "./components/UserZero/ResultsView";
 import type { JobStatusResponse } from "./types/patent";
 
-type ViewState = "landing" | "executing" | "results" | "error";
+type ViewState = "landing" | "executing" | "results" | "error" | "history";
 
 export function App() {
   const [view, setView] = useState<ViewState>("landing");
@@ -86,6 +89,38 @@ export function App() {
     else handleReset();
   };
 
+  const handleOpenHistory = () => {
+    setErrorMessage(null);
+    setErrorType(null);
+    setView("history");
+  };
+
+  // Reopens a past job's already-computed result -- a single GET against the
+  // in-memory job store, no new agent run.
+  const handleOpenJob = async (id: string) => {
+    try {
+      const res = await getAnalyzeStatus(id);
+      setJobId(id);
+      setJobStatus(res);
+      setDomain(res.domain || "");
+      setQuery(res.query || "");
+      if (res.status === "error") {
+        setErrorMessage(res.error || res.detail || "This analysis failed.");
+        setErrorType(res.error_type ?? null);
+        setView("error");
+      } else {
+        setView("results");
+      }
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Couldn't load that analysis.");
+      setView("error");
+    }
+  };
+
+  if (view === "history") {
+    return <HistoryView onOpenJob={handleOpenJob} onBack={handleReset} />;
+  }
+
   if (view === "executing") {
     return (
       <ExecutionView
@@ -108,18 +143,14 @@ export function App() {
     const isPermissionError = errorMessage?.includes("PERMISSION_DENIED") || errorMessage?.includes("aiplatform.endpoints.predict");
 
     return (
-      <main className="errorContainer">
-        <header className="errorHeader">
-          <div className="errorBrand">
-            <span className="errorBrandMark">✦</span>
-            <span>ABELL <strong>SYSTEMS</strong></span>
-          </div>
-          {domain && <div className="errorDomainBadge">{domain}</div>}
-          <div className="errorEyebrow">ANALYSIS STATUS</div>
-          <h1 className="errorTitle">
+      <main className={styles.container}>
+        <header className={styles.header}>
+          <BrandHeader domain={domain || undefined} />
+          <div className={styles.eyebrow}>ANALYSIS STATUS</div>
+          <h1 className={styles.title}>
             {isQuotaExhausted ? "AI usage limit reached" : isPermissionError ? "AI agent needs access" : "We couldn't complete the analysis."}
           </h1>
-          <p className="errorSubtitle">
+          <p className={styles.subtitle}>
             {isQuotaExhausted
               ? "Your research request is safe. The model quota is temporarily unavailable."
               : isPermissionError
@@ -128,12 +159,12 @@ export function App() {
           </p>
         </header>
 
-        <section className="errorCard" aria-label="Analysis status">
-          <div className="errorStatusRow">
-            <span className="errorStatusDot" />
+        <section className={styles.card} aria-label="Analysis status">
+          <div className={styles.statusRow}>
+            <span className={styles.statusDot} />
             <span>{isPermissionError ? "Deployment configuration issue" : "Analysis interrupted"}</span>
           </div>
-          <p className="errorMessage">
+          <p className={styles.message}>
             {isPermissionError
               ? "The service account running Cloud Run cannot currently call the configured Gemini model through Vertex AI. The deployment configuration has been corrected; redeploying the service will apply it."
               : isQuotaExhausted
@@ -141,24 +172,30 @@ export function App() {
                 : "The agent returned an unexpected error while processing this opportunity."}
           </p>
           {errorMessage && !isPermissionError && (
-            <details className="errorTechnical">
+            <details className={styles.technical}>
               <summary>Technical details</summary>
               <code>{errorMessage}</code>
             </details>
           )}
         </section>
 
-        <div className="errorActions">
+        <div className={styles.actions}>
           {!isQuotaExhausted && (
-            <button type="button" className="errorPrimaryBtn" onClick={handleRetry}>Try again</button>
+            <button type="button" className={styles.primaryBtn} onClick={handleRetry}>Try again</button>
           )}
-          <button type="button" className="errorSecondaryBtn" onClick={handleReset}>← Analyze another opportunity</button>
+          <button type="button" className={styles.secondaryBtn} onClick={handleReset}>← Analyze another opportunity</button>
         </div>
       </main>
     );
   }
 
-  return <LandingView onStartAnalysis={handleStartAnalysis} isLoading={isLoading} />;
+  return (
+    <LandingView
+      onStartAnalysis={handleStartAnalysis}
+      onOpenHistory={handleOpenHistory}
+      isLoading={isLoading}
+    />
+  );
 }
 
 export default App;

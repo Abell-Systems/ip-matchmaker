@@ -6,6 +6,7 @@ import type {
   AdversarialVerdict,
   InventionCandidate,
   JobStatusResponse,
+  JobSummary,
   PatentCluster,
   PatentRecord,
   PipelineStage,
@@ -73,5 +74,17 @@ export async function getAnalyzeStatus(jobId: string): Promise<JobStatusResponse
     throw new Error(`Failed to check analysis status: ${res.statusText}`);
   }
   return res.json() as Promise<JobStatusResponse>;
+}
+
+// Lists past/in-progress analyze jobs from this process's in-memory job
+// store. Opening one still goes through getAnalyzeStatus, which returns the
+// already-computed result -- no new Gemini/BigQuery calls.
+export async function listAnalyzeJobs(): Promise<JobSummary[]> {
+  const res = await fetch(`${API_BASE}/api/analyze`);
+  if (!res.ok) {
+    throw new Error(`Failed to list past analyses: ${res.statusText}`);
+  }
+  const data = (await res.json()) as { jobs: JobSummary[] };
+  return data.jobs;
 }
 

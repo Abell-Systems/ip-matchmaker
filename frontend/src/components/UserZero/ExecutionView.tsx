@@ -5,6 +5,7 @@ import type {
   JobProgress,
   PipelineStage,
 } from "../../types/patent";
+import { BrandHeader } from "../shared/BrandHeader";
 import { AgentActivityFeed } from "./AgentActivityFeed";
 import styles from "./ExecutionView.module.css";
 
@@ -71,6 +72,7 @@ export function ExecutionView({
   return (
     <div className={styles.container}>
       <header className={styles.header}>
+        <BrandHeader />
         <h2 className={styles.domainTitle}>{domain}</h2>
       </header>
 

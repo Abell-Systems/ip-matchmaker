@@ -53,6 +53,11 @@ class BaseJobStore(ABC):
         """Mark job errored and save error message."""
         pass
 
+    @abstractmethod
+    async def list_jobs(self) -> list[dict]:
+        """List all known jobs, newest first."""
+        pass
+
 
 class InMemoryJobStore(BaseJobStore):
     """In-memory thread-safe implementation of BaseJobStore."""
@@ -113,6 +118,12 @@ class InMemoryJobStore(BaseJobStore):
                 self._jobs[job_id]["status"] = "error"
                 self._jobs[job_id]["stage"] = "error"
                 self._jobs[job_id]["error"] = error_message
+
+    async def list_jobs(self) -> list[dict]:
+        async with self._lock:
+            jobs = [dict(job) for job in self._jobs.values()]
+        jobs.sort(key=lambda j: j.get("created_at") or "", reverse=True)
+        return jobs
 
 
 _default_job_store: Optional[BaseJobStore] = None

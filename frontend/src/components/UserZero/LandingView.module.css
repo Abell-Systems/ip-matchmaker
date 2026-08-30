@@ -1,9 +1,9 @@
 .page {
-  --ink: #111b3d;
-  --muted: #5e6888;
-  --purple: #8057f5;
-  --blue: #4e78ff;
-  --lavender: #f4f1ff;
+  --ink: var(--color-ink);
+  --muted: var(--color-muted);
+  --purple: var(--color-purple);
+  --blue: var(--color-blue);
+  --lavender: var(--color-lavender);
   position: relative;
   min-height: 100vh;
   overflow: hidden;
@@ -64,28 +64,25 @@
   justify-content: space-between;
 }
 
-.brand {
+.navRight {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
-.logoMark {
-  width: 40px;
-  height: 40px;
-  flex: 0 0 auto;
+.historyLink {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--color-text-muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 6px 4px;
 }
 
-.brandName {
-  color: #202640;
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-}
-
-.brandName strong {
-  font-weight: 500;
-  color: #60677d;
+.historyLink:hover {
+  color: var(--color-purple);
 }
 
 .productBadge {
@@ -250,11 +247,6 @@
   border-radius: 12px;
   background: white;
   box-shadow: 0 5px 15px rgba(102, 73, 202, 0.08);
-}
-
-.formMark .logoMark {
-  width: 30px;
-  height: 30px;
 }
 
 .formIntro h2 {
@@ -439,10 +431,6 @@
 
   .nav {
     padding-top: 20px;
-  }
-
-  .brandName {
-    font-size: 16px;
   }
 
   .productBadge {

@@ -504,10 +504,44 @@ async def analyze(req: AnalyzeRequest) -> dict:
     if _execution_policy.is_busy():
         raise HTTPException(status_code=503, detail="An analyze run is already in progress.")
     job_id = uuid.uuid4().hex
-    await _job_store.create_job(job_id, {"status": "running", "stage": "queued"})
+    await _job_store.create_job(
+        job_id,
+        {
+            "status": "running",
+            "stage": "queued",
+            "domain": req.domain,
+            "query": req.query,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
     asyncio.create_task(_run_job(job_id, req))
     return {"job_id": job_id, "status": "running", "stage": "queued"}
 
+
+
+@app.get("/api/analyze")
+async def list_analyze_jobs() -> dict:
+    """Lists past/in-progress analyze jobs (in-memory, this process only), newest first.
+
+    Summary only -- open a specific job via GET /api/analyze/{job_id} for the
+    full result (candidates/verdicts/scorecards), which is already served from
+    the job store without re-running anything.
+    """
+    jobs = await _job_store.list_jobs()
+    return {
+        "jobs": [
+            {
+                "job_id": job.get("id"),
+                "domain": job.get("domain"),
+                "query": job.get("query"),
+                "status": job.get("status"),
+                "stage": job.get("stage"),
+                "created_at": job.get("created_at"),
+                "candidate_count": len(job.get("result", {}).get("candidates") or []) if job.get("result") else 0,
+            }
+            for job in jobs
+        ]
+    }
 
 
 @app.get("/api/analyze/{job_id}")

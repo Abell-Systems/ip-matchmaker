@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { AdversarialVerdict, JobStatusResponse, ScoreCard } from "../../types/patent";
+import { BrandHeader } from "../shared/BrandHeader";
 import { CausalChain } from "./CausalChain";
 import styles from "./ResultsView.module.css";
 
@@ -96,6 +97,7 @@ export function ResultsView({ domain, result, onReset }: ResultsViewProps) {
     return (
       <div className={styles.container}>
         <header className={styles.header}>
+          <BrandHeader />
           {domain && <h2 className={styles.domainTitle}>{domain}</h2>}
           <h1 className={styles.title}>Analysis Completed</h1>
         </header>
@@ -125,6 +127,7 @@ export function ResultsView({ domain, result, onReset }: ResultsViewProps) {
   return (
     <div className={styles.container}>
       <header className={styles.header}>
+        <BrandHeader />
         {domain && <div className={styles.domainBadge}>{domain}</div>}
         <h1 className={styles.title}>
           {isSurvived

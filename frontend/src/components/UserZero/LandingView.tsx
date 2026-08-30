@@ -1,27 +1,11 @@
 import { useState } from "react";
+import { AbellMark, BrandHeader } from "../shared/BrandHeader";
 import styles from "./LandingView.module.css";
 
 interface LandingViewProps {
   onStartAnalysis: (domain: string, query: string) => void;
+  onOpenHistory?: () => void;
   isLoading?: boolean;
-}
-
-function AbellMark() {
-  return (
-    <svg className={styles.logoMark} viewBox="0 0 48 48" aria-hidden="true">
-      <defs>
-        <linearGradient id="abell-gradient" x1="8" y1="8" x2="40" y2="40">
-          <stop offset="0%" stopColor="#8b5cf6" />
-          <stop offset="55%" stopColor="#6d5dfc" />
-          <stop offset="100%" stopColor="#4f7cff" />
-        </linearGradient>
-      </defs>
-      <path
-        d="M27.6 4 10.2 25.2c-1.2 1.5-.2 3.8 1.8 3.8h9.2l-3.2 15.1c-.4 2.1 2.2 3.2 3.4 1.5L38 23.9c1.2-1.6.1-3.9-1.9-3.9h-9.2l3.9-12.9C31.5 4.8 29.1 2.6 27.6 4Z"
-        fill="url(#abell-gradient)"
-      />
-    </svg>
-  );
 }
 
 function SearchIcon() {
@@ -51,7 +35,7 @@ function ShieldIcon() {
   );
 }
 
-export function LandingView({ onStartAnalysis, isLoading }: LandingViewProps) {
+export function LandingView({ onStartAnalysis, onOpenHistory, isLoading }: LandingViewProps) {
   const [domain, setDomain] = useState("Solid-state electrolytes for EV batteries");
   const [query, setQuery] = useState("solid electrolyte interphase");
 
@@ -68,13 +52,17 @@ export function LandingView({ onStartAnalysis, isLoading }: LandingViewProps) {
       <div className={styles.decorShape} aria-hidden="true" />
 
       <header className={styles.nav}>
-        <div className={styles.brand}>
-          <AbellMark />
-          <span className={styles.brandName}>ABELL <strong>SYSTEMS</strong></span>
-        </div>
-        <div className={styles.productBadge}>
-          <span className={styles.badgeSpark}>✦</span>
-          Patent Innovation Agent
+        <BrandHeader />
+        <div className={styles.navRight}>
+          <div className={styles.productBadge}>
+            <span className={styles.badgeSpark}>✦</span>
+            Patent Innovation Agent
+          </div>
+          {onOpenHistory && (
+            <button type="button" className={styles.historyLink} onClick={onOpenHistory}>
+              Past analyses
+            </button>
+          )}
         </div>
       </header>
 
@@ -121,7 +109,7 @@ export function LandingView({ onStartAnalysis, isLoading }: LandingViewProps) {
 
         <form className={styles.formCard} onSubmit={handleSubmit}>
           <div className={styles.formIntro}>
-            <div className={styles.formMark}><AbellMark /></div>
+            <div className={styles.formMark}><AbellMark size={30} /></div>
             <div>
               <h2>Start your analysis</h2>
               <p>Define your domain and research focus to begin.</p>

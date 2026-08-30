@@ -28,3 +28,21 @@ async def test_job_store_lifecycle():
     job = await store.get_job(job_id)
     assert job["status"] == "done"
     assert job["result"] == {"verdicts": ["ok"]}
+
+
+@pytest.mark.anyio
+async def test_list_jobs_returns_newest_first():
+    store = InMemoryJobStore()
+
+    await store.create_job("older", {"created_at": "2026-08-30T10:00:00+00:00"})
+    await store.create_job("newer", {"created_at": "2026-08-30T12:00:00+00:00"})
+
+    jobs = await store.list_jobs()
+
+    assert [j["id"] for j in jobs] == ["newer", "older"]
+
+
+@pytest.mark.anyio
+async def test_list_jobs_empty_store():
+    store = InMemoryJobStore()
+    assert await store.list_jobs() == []

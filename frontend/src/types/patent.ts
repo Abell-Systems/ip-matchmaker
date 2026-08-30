@@ -103,6 +103,8 @@ export interface JobProgress {
 
 export interface JobStatusResponse {
   job_id?: string;
+  domain?: string;
+  query?: string;
   status: "running" | "done" | "error";
   stage: PipelineStage;
   progress?: JobProgress;
@@ -114,6 +116,16 @@ export interface JobStatusResponse {
   error?: string;
   error_type?: "quota_exhausted" | "timeout" | "unknown";
   detail?: string;
+}
+
+export interface JobSummary {
+  job_id: string;
+  domain: string | null;
+  query: string | null;
+  status: "running" | "done" | "error";
+  stage: PipelineStage;
+  created_at: string | null;
+  candidate_count: number;
 }
 
 
