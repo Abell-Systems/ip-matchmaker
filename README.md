@@ -4,7 +4,7 @@ _Finds patentable white-space opportunities by mining patent landscapes, proposi
 
 Built for the **Devpost "All Things Agentic Hackathon"** (Google Cloud / Gemini) — track: **The Taskmaster**.
 
-> Status: Live deployed on Google Cloud Run at [`https://patent-agent-873418702379.us-central1.run.app`](https://patent-agent-873418702379.us-central1.run.app). Full agent graph (research → inventor/adversarial loop → governor) live-validated. Async `/api/analyze` job endpoint wired into OpportunityMap frontend. CI (pytest + tsc/vite/oxlint) passing on every push/PR. See [`docs/roadmap.md`](docs/roadmap.md) and [`docs/architecture.md`](docs/architecture.md).
+> Status: Live deployed on Google Cloud Run at [`https://patent-agent-sedvtsa23q-uc.a.run.app`](https://patent-agent-sedvtsa23q-uc.a.run.app). Full agent graph (research → inventor/adversarial loop → governor) live-validated. Real BigQuery data (not mock) served from a materialized domain index — see `docs/deploy.md` §2b. Async `/api/analyze` job endpoint wired into OpportunityMap frontend. CI (pytest + tsc/vite/oxlint) passing on every push/PR. See [`docs/roadmap.md`](docs/roadmap.md) and [`docs/architecture.md`](docs/architecture.md).
 
 ## Architecture
 
