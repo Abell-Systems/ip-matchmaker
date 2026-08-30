@@ -63,7 +63,7 @@ IP Matchmaker is not a conversational chatbot. It takes direct action:
 ## 6. Example Finding & Validation
 In our live validation run on solid-state battery electrolytes:
 - **Input Domain**: Solid-state electrolytes for EV batteries.
-- **Market Demand**: Innoget technology call for high-conductivity, stable interface coatings.
+- **Market Demand**: A simulated demand signal for high-conductivity, stable interface coatings. `InnogetDemandDataSource` parses a real, locally-collected Innoget technology-calls dataset, but its 19 records don't currently cover the battery domain, so the deployed demo runs `DEMAND_SOURCE=mock` for this locked domain -- the `demand` term in the white-space formula is real code, exercised with representative fixture data rather than a live match.
 - **White-Space Cluster**: `cluster-C08L` (Polymer compositions / interfacial buffer layers).
 - **Candidate Invention**: *"Zwitterionic Polyimide MLD Interfacial Buffer Layer"*.
 - **Adversarial Verdict**: Rejected initial draft citing 4 prior-art publication numbers (`US-10448361-B2-17`, `US-10437821-B2-0`), prompting the Inventor agent to refine the chemical composition.
@@ -101,7 +101,7 @@ npm run dev
 
 - [x] **Hosted project URL**: Verified Cloud Run endpoint (`https://patent-agent-...run.app`).
 - [x] **Description & Features**: Fully articulated 4-stage pipeline (Research, Cluster, Loop, Governor).
-- [x] **Data sources**: Google Patents Public Datasets on BigQuery + Innoget Demand Signals.
+- [x] **Data sources**: Google Patents Public Datasets on BigQuery (real, via a materialized domain index -- see `docs/deploy.md` §2b) + a simulated market-demand signal (`InnogetDemandDataSource` implements real Innoget dataset parsing, but the deployed demo uses `DEMAND_SOURCE=mock` since the current 19-record Innoget fixture doesn't cover the battery domain).
 - [x] **Findings/learnings**: Solid-state electrolyte case study documented with before/after agent iteration.
 - [x] **Repository URL**: GitHub public repo with complete setup instructions.
 - [x] **README spin-up**: Reproducible instructions for both mock and real GCP modes.

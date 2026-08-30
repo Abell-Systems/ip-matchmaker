@@ -28,12 +28,12 @@
   > "Finding genuine, patentable white-space opportunities is like finding a needle in a haystack. Traditional keyword search tools return thousands of dense patents, leaving researchers to manually guess prior-art risks."
 
 ### 0:30 – 1:00 | Input (Domain Selection)
-- **Visual:** User inputs query *"solid-state electrolytes"* and domain *"EV batteries"* in the IP Matchmaker UI. Innoget market-demand signals load automatically.
+- **Visual:** User inputs query *"solid-state electrolytes"* and domain *"EV batteries"* in the IP Matchmaker UI.
 - **Voiceover:**
-  > "Meet IP Matchmaker: an autonomous R&D intelligence agent built on Google ADK, Gemini 3.5, and Google Cloud BigQuery. We start by specifying a technical domain—solid-state electrolytes for EV batteries—combining supply-side patents with live industry demand calls."
+  > "Meet IP Matchmaker: an autonomous R&D intelligence agent built on Google ADK, Gemini 3.5, and Google Cloud BigQuery. We start by specifying a technical domain—solid-state electrolytes for EV batteries—combining supply-side patents with a market-demand signal."
 
 ### 1:00 – 1:40 | Landscape + White-Space
-- **Visual:** React OpportunityMap renders technology clusters. Hover over green cluster `c1` ("Solid Electrolytes - Sulfide & Oxide Interfaces") displaying high `white_space_score`.
+- **Visual:** The execution view shows the pipeline stages advancing live. Highlight the white-space cluster ("Solid Electrolytes - Sulfide & Oxide Interfaces") and its `white_space_score` once results land.
 - **Voiceover:**
   > "Our landscape engine mines Google Patents Public Datasets on BigQuery, groups patents by CPC classification, and calculates a quantitative white-space score combining density, recency, citation velocity, and market demand. Clusters highlighted in green reveal true innovation white spaces."
 
