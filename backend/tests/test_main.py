@@ -71,11 +71,22 @@ def test_validated_recovers_json_wrapped_in_prose_or_fence():
     assert out == [good, good]
 
 
+def test_analyze_rejects_unsupported_domain():
+    resp = client.post("/api/analyze", json={"query": "cancer", "domain": "Biotechnology"})
+    assert resp.status_code == 422
+    assert "battery" in resp.json()["detail"].lower()
+
+
+def test_landscape_rejects_unsupported_domain():
+    resp = client.get("/api/landscape", params={"query": "cancer", "domain": "Biotechnology"})
+    assert resp.status_code == 422
+
+
 def test_landscape_rejects_invalid_params():
-    assert client.get("/api/landscape", params={"query": "", "domain": "d"}).status_code == 422
+    assert client.get("/api/landscape", params={"query": "", "domain": "battery electrolyte"}).status_code == 422
     assert client.get("/api/landscape", params={"query": "q", "domain": ""}).status_code == 422
     assert (
-        client.get("/api/landscape", params={"query": "q", "domain": "d", "max_results": 1000}).status_code
+        client.get("/api/landscape", params={"query": "q", "domain": "battery electrolyte", "max_results": 1000}).status_code
         == 422
     )
 
@@ -106,7 +117,7 @@ def test_landscape_single_search_and_valid_clusters():
     original = main.get_patents_datasource
     main.get_patents_datasource = lambda: SpySource()
     try:
-        response = client.get("/api/landscape", params={"query": "q", "domain": "d"})
+        response = client.get("/api/landscape", params={"query": "q", "domain": "battery electrolyte"})
     finally:
         main.get_patents_datasource = original
     assert response.status_code == 200
@@ -126,7 +137,7 @@ def test_analyze_returns_202_with_job_id_and_completes(monkeypatch):
         return {"candidates": [], "verdicts": [], "scorecards": []}
 
     monkeypatch.setattr(main, "_execute_analysis", fake_execute)
-    resp = client.post("/api/analyze", json={"query": "q", "domain": "d", "cluster_id": "c"})
+    resp = client.post("/api/analyze", json={"query": "q", "domain": "battery electrolyte", "cluster_id": "c"})
     assert resp.status_code == 202
     job_id = resp.json()["job_id"]
     import time
@@ -154,7 +165,7 @@ def test_list_analyze_jobs_includes_domain_query_and_candidate_count(monkeypatch
         return {"candidates": [{"candidate_id": "c1"}], "verdicts": [], "scorecards": []}
 
     monkeypatch.setattr(main, "_execute_analysis", fake_execute)
-    resp = client.post("/api/analyze", json={"query": "history-query", "domain": "history-domain"})
+    resp = client.post("/api/analyze", json={"query": "history-query", "domain": "history-domain-battery-electrolyte"})
     job_id = resp.json()["job_id"]
 
     for _ in range(100):
@@ -166,7 +177,7 @@ def test_list_analyze_jobs_includes_domain_query_and_candidate_count(monkeypatch
     assert listing.status_code == 200
     jobs = listing.json()["jobs"]
     match = next(j for j in jobs if j["job_id"] == job_id)
-    assert match["domain"] == "history-domain"
+    assert match["domain"] == "history-domain-battery-electrolyte"
     assert match["query"] == "history-query"
     assert match["status"] == "done"
     assert match["candidate_count"] == 1
@@ -182,7 +193,7 @@ def test_analyze_rejects_concurrent_runs(monkeypatch):
 
     class FakeReq:
         query = "q"
-        domain = "d"
+        domain = "battery electrolyte"
         cluster_id = "c"
 
     async def slow_execute(job_id, req):
@@ -190,9 +201,9 @@ def test_analyze_rejects_concurrent_runs(monkeypatch):
         return {"candidates": [], "verdicts": [], "scorecards": []}
 
     monkeypatch.setattr(main, "_execute_analysis", slow_execute)
-    first = client.post("/api/analyze", json={"query": "q", "domain": "d", "cluster_id": "c"})
+    first = client.post("/api/analyze", json={"query": "q", "domain": "battery electrolyte", "cluster_id": "c"})
     assert first.status_code == 202
-    second = client.post("/api/analyze", json={"query": "q", "domain": "d", "cluster_id": "c2"})
+    second = client.post("/api/analyze", json={"query": "q", "domain": "battery electrolyte", "cluster_id": "c2"})
     assert second.status_code == 503
     gate.set()
 
@@ -211,7 +222,7 @@ def test_analyze_status_flattens_result_for_frontend_contract(monkeypatch):
         return {"candidates": [{"candidate_id": "c1"}], "verdicts": [], "scorecards": []}
 
     monkeypatch.setattr(main, "_execute_analysis", fake_execute)
-    resp = client.post("/api/analyze", json={"query": "q", "domain": "d"})
+    resp = client.post("/api/analyze", json={"query": "q", "domain": "battery electrolyte"})
     job_id = resp.json()["job_id"]
 
     for _ in range(100):
@@ -236,7 +247,7 @@ def test_analyze_rate_limits_per_ip(monkeypatch):
 
     monkeypatch.setattr(main, "_execute_analysis", fake_execute)
     for _ in range(main._ANALYZE_RATE_LIMIT):
-        resp = client.post("/api/analyze", json={"query": "q", "domain": "d"})
+        resp = client.post("/api/analyze", json={"query": "q", "domain": "battery electrolyte"})
         assert resp.status_code == 202
         for _ in range(100):
             if client.get(f"/api/analyze/{resp.json()['job_id']}").json()["status"] != "running":
@@ -245,7 +256,7 @@ def test_analyze_rate_limits_per_ip(monkeypatch):
 
             time.sleep(0.05)
 
-    over_limit = client.post("/api/analyze", json={"query": "q", "domain": "d"})
+    over_limit = client.post("/api/analyze", json={"query": "q", "domain": "battery electrolyte"})
     assert over_limit.status_code == 429
 
 

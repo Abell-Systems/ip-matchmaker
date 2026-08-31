@@ -141,6 +141,7 @@ export function App() {
   if (view === "error") {
     const isQuotaExhausted = errorType === "quota_exhausted";
     const isPermissionError = errorMessage?.includes("PERMISSION_DENIED") || errorMessage?.includes("aiplatform.endpoints.predict");
+    const isUnsupportedDomain = errorMessage?.includes("outside that scope");
 
     return (
       <main className={styles.container}>
@@ -148,28 +149,38 @@ export function App() {
           <BrandHeader domain={domain || undefined} />
           <div className={styles.eyebrow}>ANALYSIS STATUS</div>
           <h1 className={styles.title}>
-            {isQuotaExhausted ? "AI usage limit reached" : isPermissionError ? "AI agent needs access" : "We couldn't complete the analysis."}
+            {isQuotaExhausted
+              ? "AI usage limit reached"
+              : isPermissionError
+                ? "AI agent needs access"
+                : isUnsupportedDomain
+                  ? "This domain isn't covered yet"
+                  : "We couldn't complete the analysis."}
           </h1>
           <p className={styles.subtitle}>
             {isQuotaExhausted
               ? "Your research request is safe. The model quota is temporarily unavailable."
               : isPermissionError
                 ? "The analysis engine is deployed, but its Cloud AI permission is not ready yet."
-                : "Your opportunity wasn't lost. You can retry the analysis or start a new one."}
+                : isUnsupportedDomain
+                  ? "This demo's patent data is scoped to one technology domain."
+                  : "Your opportunity wasn't lost. You can retry the analysis or start a new one."}
           </p>
         </header>
 
         <section className={styles.card} aria-label="Analysis status">
           <div className={styles.statusRow}>
             <span className={styles.statusDot} />
-            <span>{isPermissionError ? "Deployment configuration issue" : "Analysis interrupted"}</span>
+            <span>{isPermissionError ? "Deployment configuration issue" : isUnsupportedDomain ? "Domain out of scope" : "Analysis interrupted"}</span>
           </div>
           <p className={styles.message}>
             {isPermissionError
               ? "The service account running Cloud Run cannot currently call the configured Gemini model through Vertex AI. The deployment configuration has been corrected; redeploying the service will apply it."
               : isQuotaExhausted
                 ? "Please wait a moment and try again."
-                : "The agent returned an unexpected error while processing this opportunity."}
+                : isUnsupportedDomain
+                  ? "Try \"Solid-state electrolytes for EV batteries\" — that's the domain this demo has real patent data for."
+                  : "The agent returned an unexpected error while processing this opportunity."}
           </p>
           {errorMessage && !isPermissionError && (
             <details className={styles.technical}>

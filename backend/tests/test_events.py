@@ -95,7 +95,7 @@ def test_analyze_status_returns_events_in_response(monkeypatch):
         return {"candidates": [], "verdicts": [], "scorecards": [], "events": _jobs[job_id].get("events", [])}
 
     monkeypatch.setattr(main, "_execute_analysis", fake_execute)
-    resp = client.post("/api/analyze", json={"query": "q", "domain": "d", "cluster_id": "c"})
+    resp = client.post("/api/analyze", json={"query": "q", "domain": "battery electrolyte", "cluster_id": "c"})
     assert resp.status_code == 202
     job_id = resp.json()["job_id"]
 

@@ -27,6 +27,7 @@ from google.genai import types  # noqa: E402
 from pydantic import BaseModel, Field, ValidationError  # noqa: E402
 
 from patent_agent.agent import build_invention_pipeline  # noqa: E402
+from patent_agent.config import is_supported_domain  # noqa: E402
 from patent_agent.provider import LLMProvider  # noqa: E402
 from patent_agent.services.research_service import get_research_service  # noqa: E402
 from patent_agent.shared.job_store import get_job_store  # noqa: E402
@@ -129,6 +130,17 @@ def health() -> dict:
     }
 
 
+def _check_domain_supported(domain: str) -> None:
+    if not is_supported_domain(domain):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"This demo's patent data only covers solid-state EV battery electrolytes -- "
+                f"'{domain}' is outside that scope and would produce unreliable results."
+            ),
+        )
+
+
 @app.get("/api/landscape")
 async def get_landscape(
     query: str = Query(min_length=1),
@@ -136,6 +148,7 @@ async def get_landscape(
     max_results: int = Query(20, ge=1, le=100),
 ) -> dict:
     """Deterministic view of the unified research + clustering pipeline."""
+    _check_domain_supported(domain)
     res = await _research_service.conduct_research(query=query, domain=domain, max_patents=max_results)
     return {
         "query": res.query,
@@ -588,6 +601,7 @@ def _check_rate_limit(client_ip: str) -> None:
 @app.post("/api/analyze", status_code=202)
 async def analyze(req: AnalyzeRequest, request: Request) -> dict:
     """Kicks off the unified research service + agent graph in the background and returns a job id immediately."""
+    _check_domain_supported(req.domain)
     _check_rate_limit(request.client.host if request.client else "unknown")
     if _execution_policy.is_busy():
         raise HTTPException(status_code=503, detail="An analyze run is already in progress.")
