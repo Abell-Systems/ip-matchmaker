@@ -4,7 +4,7 @@ _Finds patentable white-space opportunities by mining patent landscapes, proposi
 
 Built for the **Devpost "All Things Agentic Hackathon"** (Google Cloud / Gemini) — track: **The Taskmaster**.
 
-> Status: Live deployed on Google Cloud Run at [`https://patent-agent-sedvtsa23q-uc.a.run.app`](https://patent-agent-sedvtsa23q-uc.a.run.app). Full agent graph (research → inventor/adversarial loop → governor) live-validated. Real BigQuery data (not mock) served from a materialized domain index — see `docs/deploy.md` §2b. Async `/api/analyze` job endpoint wired into OpportunityMap frontend. CI (pytest + tsc/vite/oxlint) passing on every push/PR. See [`docs/roadmap.md`](docs/roadmap.md) and [`docs/architecture.md`](docs/architecture.md).
+> Status: Live deployed on Google Cloud Run at [`https://patent-agent-sedvtsa23q-uc.a.run.app`](https://patent-agent-sedvtsa23q-uc.a.run.app). Full agent graph (research → inventor/adversarial loop → governor) live-validated, returning fully populated candidates/verdicts/scorecards end to end. Real BigQuery data (not mock) served from a materialized domain index — see `docs/deploy.md` §2b. Async `/api/analyze` job endpoint wired into the frontend's execution/results flow, with a history view to reopen past analyses. CI (pytest + tsc/vite/oxlint) passing on every push/PR. See [`docs/roadmap.md`](docs/roadmap.md) and [`docs/architecture.md`](docs/architecture.md).
 
 ## Architecture
 
@@ -13,9 +13,9 @@ See [`docs/architecture.md`](docs/architecture.md) for the full component breakd
 ## Features
 
 - ✅ Patent landscape search + CPC-prefix clustering with a white-space score (density + recency + citation velocity + demand), exposed at `GET /api/landscape` — live on Cloud Run.
-- ✅ Frontend `OpportunityMap` renders that landscape live: search, expandable cluster cards, and candidate/scorecard drill-down with cited prior art.
-- ✅ Full agent graph (research → inventor/adversarial loop → governor) Gemini-backed and live-validated.
-- ✅ `POST /api/analyze` background job execution with `GET /api/analyze/{job_id}` polling.
+- ✅ Frontend flow (landing → live execution feed → results) renders the landscape and a candidate's full journey live: agent activity feed, adversarial verdict with cited prior art, governor scorecard.
+- ✅ Full agent graph (research → inventor/adversarial loop → governor) Gemini-backed and live-validated, returning a fully populated candidate/verdict/scorecard on every real run.
+- ✅ `POST /api/analyze` background job execution with `GET /api/analyze/{job_id}` polling, plus a history view to browse and reopen past analyses without re-running the pipeline.
 - ✅ CI (GitHub Actions) runs backend `pytest` and frontend `tsc`/`vite build`/`oxlint` on every push and PR.
 - ✅ Deployed live on Google Cloud Run (`us-central1`).
 

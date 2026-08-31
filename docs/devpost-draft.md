@@ -29,7 +29,7 @@ IP Matchmaker provides an end-to-end autonomous R&D workflow:
 
 ```text
 [Innoget Tech Calls] ──> [InnogetDemandDataSource] ──┐
-                                                    ├──> [clustering.py] ──> [OpportunityMap UI]
+                                                    ├──> [clustering.py] ──> [Frontend landing/results UI]
 [Google Patents / BQ] ──> [PatentsDataSource] ──────┘           │
                                                                 ▼
                                                 [POST /api/analyze (ADK Runner)]
@@ -47,7 +47,7 @@ IP Matchmaker provides an end-to-end autonomous R&D workflow:
 - **Agent Framework**: Built using **Google ADK** (Python), composing `LlmAgent`, `SequentialAgent`, and nested `LoopAgent`.
 - **LLM Engine**: Powered by **Gemini 3.5** (`gemini-3.5-flash` / `gemini-3.5-flash-lite`).
 - **Data Layer**: Google Patents Public Datasets on BigQuery + Innoget Technology Calls feed.
-- **Frontend**: React + Vite (TypeScript) rendering the interactive `OpportunityMap` with live background-job polling (`POST /api/analyze` $\rightarrow$ `202 Job Accepted` $\rightarrow$ `GET /api/analyze/{job_id}`).
+- **Frontend**: React + Vite (TypeScript) rendering a live execution feed and results view with background-job polling (`POST /api/analyze` $\rightarrow$ `202 Job Accepted` $\rightarrow$ `GET /api/analyze/{job_id}`), plus a history view to reopen past analyses.
 - **Infrastructure**: Cloud Run containerized deployment (`backend/Dockerfile`).
 
 ---
@@ -80,7 +80,7 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp ../.env.example .env
 
-# Run full test suite (49/49 tests passing)
+# Run full test suite (89/89 tests passing)
 .venv/bin/pytest tests/ -v
 
 # Run interactive ADK Web UI or FastAPI server
@@ -111,4 +111,4 @@ npm run dev
 - [x] **Hackathon Track**: **Taskmaster**.
 - [x] **Gemini requirement**: Configured with `gemini-3.5-flash`.
 - [x] **Google Agent Framework requirement**: Built natively with Google ADK (`SequentialAgent`, `LoopAgent`, `LlmAgent`).
-- [x] **Google Cloud Infrastructure requirement**: Deployed on Cloud Run. BigQuery data-source code is implemented and tested (`BigQueryPatentsDataSource`) but the live deploy currently runs `USE_MOCK_BIGQUERY=true`; flip to `false` once the deploying service account has confirmed BigQuery access to the public patents dataset.
+- [x] **Google Cloud Infrastructure requirement**: Deployed on Cloud Run. Live deploy runs `USE_MOCK_BIGQUERY=false`, serving real BigQuery data via a materialized domain index (`patent_agent_index.domain_index`, ~15.7MB/query vs. ~245GB against the raw public dataset — see `docs/deploy.md` §2b).
