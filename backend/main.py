@@ -634,11 +634,23 @@ async def list_analyze_jobs() -> dict:
 
 @app.get("/api/analyze/{job_id}")
 async def analyze_status(job_id: str) -> dict:
-    """Poll endpoint for a background analyze run."""
+    """Poll endpoint for a background analyze run.
+
+    The job store keeps the final result nested under job["result"], but the
+    frontend's JobStatusResponse (frontend/src/types/patent.ts) expects
+    candidates/verdicts/scorecards flat on the response -- flatten here
+    rather than changing the frontend or the job store's internal shape.
+    """
     job = await _job_store.get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Unknown job id.")
-    return job
+    response = dict(job)
+    response["job_id"] = response.pop("id", job_id)
+    result = response.pop("result", None) or {}
+    response["candidates"] = result.get("candidates", [])
+    response["verdicts"] = result.get("verdicts", [])
+    response["scorecards"] = result.get("scorecards", [])
+    return response
 
 
 def _get_dist_dir() -> str | None:

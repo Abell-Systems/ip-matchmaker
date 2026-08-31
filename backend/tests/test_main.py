@@ -197,6 +197,34 @@ def test_analyze_rejects_concurrent_runs(monkeypatch):
     gate.set()
 
 
+def test_analyze_status_flattens_result_for_frontend_contract(monkeypatch):
+    """GET /api/analyze/{id} must expose candidates/verdicts/scorecards at the
+    top level, not nested under "result" -- frontend/src/types/patent.ts's
+    JobStatusResponse and ResultsView.tsx both read them flat."""
+    import asyncio
+    import time
+
+    import main
+
+    async def fake_execute(job_id, req):
+        await asyncio.sleep(0)
+        return {"candidates": [{"candidate_id": "c1"}], "verdicts": [], "scorecards": []}
+
+    monkeypatch.setattr(main, "_execute_analysis", fake_execute)
+    resp = client.post("/api/analyze", json={"query": "q", "domain": "d"})
+    job_id = resp.json()["job_id"]
+
+    for _ in range(100):
+        body = client.get(f"/api/analyze/{job_id}").json()
+        if body["status"] != "running":
+            break
+        time.sleep(0.05)
+
+    assert body["candidates"] == [{"candidate_id": "c1"}]
+    assert "result" not in body
+    assert body["job_id"] == job_id
+
+
 def test_analyze_rate_limits_per_ip(monkeypatch):
     import asyncio
 

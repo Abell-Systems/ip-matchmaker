@@ -19,7 +19,9 @@ export function AgentActivityFeed({ events = [], isLive = false }: AgentActivity
             </div>
           )}
         </div>
-        <p className={styles.emptyState}>Evidence unavailable for this step.</p>
+        <p className={styles.emptyState}>
+          {isLive ? "Waiting for the agent's first move…" : "No activity recorded for this run."}
+        </p>
       </div>
     );
   }

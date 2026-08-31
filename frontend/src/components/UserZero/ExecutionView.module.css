@@ -26,9 +26,10 @@
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  border: 1px solid currentColor;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 1.25rem 1.5rem;
+  background: var(--color-surface);
 }
 
 .stepRow {
@@ -36,11 +37,12 @@
   align-items: center;
   gap: 0.85rem;
   padding: 0.65rem 0;
-  transition: opacity 0.2s ease, color 0.2s ease;
+  color: var(--color-text-muted);
+  transition: color 0.2s ease;
 }
 
 .stepRow:not(:last-child) {
-  border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .icon {
@@ -63,32 +65,35 @@
 .metric {
   font-size: 0.85rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  opacity: 0.8;
   white-space: nowrap;
 }
 
 .pending {
-  opacity: 0.4;
+  color: var(--color-text-muted);
 }
 
 .active {
-  opacity: 1;
+  color: var(--color-purple);
   font-weight: 600;
 }
 
 .completed {
-  opacity: 0.85;
+  color: var(--color-success);
+}
+
+.completed .label {
+  color: var(--color-text);
+  font-weight: 500;
 }
 
 .notice {
   font-size: 0.9rem;
-  opacity: 0.8;
   margin-top: 0.5rem;
-  background: rgba(99, 102, 241, 0.1);
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  background: var(--color-lavender);
+  border: 1px solid var(--color-border);
   padding: 0.85rem 1rem;
   border-radius: 6px;
-  color: #a5b4fc;
+  color: var(--color-ink);
   font-weight: 500;
 }
 
@@ -97,8 +102,8 @@
 }
 
 .adversarialBox {
-  background: #1e1b4b;
-  border: 1px solid #4338ca;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 1.25rem;
   margin-top: 1rem;
@@ -119,17 +124,23 @@
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #c7d2fe;
+  color: var(--color-purple);
+}
+
+.candidateLabel {
+  font-size: 0.85rem;
+  color: var(--color-purple);
+  font-weight: 600;
 }
 
 .killBanner {
   font-size: 0.95rem;
   font-weight: 600;
-  color: #f43f5e;
-  background: rgba(244, 63, 94, 0.1);
+  color: var(--color-error);
+  background: var(--color-error-surface);
   padding: 0.5rem 0.75rem;
   border-radius: 4px;
-  border: 1px solid rgba(244, 63, 94, 0.2);
+  border: 1px solid var(--color-error-surface);
 }
 
 .attackFlow {
@@ -139,8 +150,8 @@
 }
 
 .attackStep {
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   padding: 0.85rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -156,30 +167,39 @@
 }
 
 .attackTitle {
-  color: #818cf8;
+  color: var(--color-purple);
+}
+
+.attackStatusPending {
+  color: var(--color-purple);
 }
 
 .attackStatusRejected {
-  color: #f87171;
+  color: var(--color-error);
 }
 
 .attackStatusRevised {
-  color: #a3e635;
+  color: var(--color-warning);
 }
 
 .attackStatusSurvived {
-  color: #34d399;
+  color: var(--color-success);
 }
 
 .attackDetail {
-  color: #cbd5e1;
+  color: var(--color-text);
   line-height: 1.4;
   margin-top: 0.25rem;
 }
 
+.citedPatents {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
 .arrowDown {
   text-align: center;
-  color: #6366f1;
+  color: var(--color-purple);
   font-weight: bold;
   font-size: 1.1rem;
   margin: -0.25rem 0;

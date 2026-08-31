@@ -110,7 +110,7 @@ export function ExecutionView({
           <div className={styles.adversarialHeader}>
             <h3 className={styles.adversarialTitle}>INVENTION VALIDATION</h3>
             {candidates.length > 0 && (
-              <span style={{ fontSize: "0.85rem", color: "#a5b4fc", fontWeight: 600 }}>
+              <span className={styles.candidateLabel}>
                 Candidate #{candidates[0].candidate_id}: {candidates[0].title}
               </span>
             )}
@@ -124,7 +124,7 @@ export function ExecutionView({
               <div className={styles.attackStep}>
                 <div className={styles.attackHeader}>
                   <span className={styles.attackTitle}>Attack #1</span>
-                  <span className={styles.attackStatusRejected}>In progress...</span>
+                  <span className={styles.attackStatusPending}>In progress...</span>
                 </div>
                 <div className={styles.attackDetail}>Evaluating claims against patent landscape prior art.</div>
               </div>
@@ -156,7 +156,7 @@ export function ExecutionView({
                         <span className={statusClass}>{statusText}</span>
                       </div>
                       {v.cited_patents && v.cited_patents.length > 0 && (
-                        <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+                        <div className={styles.citedPatents}>
                           Prior art: {v.cited_patents.join(", ")}
                         </div>
                       )}
