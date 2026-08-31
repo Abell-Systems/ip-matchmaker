@@ -34,13 +34,16 @@ Esto refleja exactamente cómo trabaja un examinador de patentes profesional: un
 - Una ejecución real produjo un candidato puntuado así: *"In-Situ Formed Halide-Borate Composite SEI via Vapor-Phase Halogenation"* — novedad 0.92, riesgo de arte previo 0.85, diferenciación 0.88, evidencia 0.95, citando las patentes `US-10448361-B2`, `US-10437821-B2` y `US-11226419-B2`.
 - La interfaz web muestra el mapa de oportunidades: grupos de patentes con sus espacios en blanco, y al hacer clic en un grupo, las invenciones propuestas con sus puntuaciones y citas.
 
-**Pendiente:**
-- Subir el vídeo de demostración a YouTube/Vimeo como *unlisted* y enlazarlo en `docs/devpost-draft.md`.
-
 **Listo (31 de agosto):**
 - Desplegado en Google Cloud Run con datos reales de BigQuery.
-- Vídeo de demostración grabado, silencioso y con subtítulos en pantalla: `docs/demo/patent-innovation-agent-demo.mp4` (2:07, muy por debajo del límite de 4 minutos).
-- Guion de narración listo para grabar la voz en off: `docs/demo/narration_script.md`. Si te animas a poner la voz, esa es la estructura: Problema → qué hace Abell Systems → evidencia real de patentes → agente inventor → desafío adversarial → oportunidad superviviente → por qué importa. No hace falta narrar la interfaz, la pantalla ya aporta la prueba.
+- Vídeo técnico grabado, silencioso y con subtítulos en pantalla: `docs/demo/patent-innovation-agent-demo.mp4` (2:07, foco 100% en el producto).
+- Vídeo "pitch" con la narrativa Mens et Manus (MIT → el problema → la idea → demo real → por qué importa → visión): `docs/demo/abell-systems-pitch.mp4` (3:42, silencioso, con texto en pantalla).
+- Guion de narración para el vídeo técnico: `docs/demo/narration_script.md`.
+- **Deck de presentación para la demo en directo:** `docs/demo/abell-systems-pitch.pptx` (11 diapositivas, misma narrativa Mens et Manus). La diapositiva 6 ("LIVE DEMO") es la chuleta para el presentador: trae escrito literalmente el dominio y la query a teclear, y el orden de clics (Analyze opportunity → View evidence → How the agent reached this result). Ábrelo en PowerPoint o Google Slides y sigue esa diapositiva mientras uno de los dos maneja la app en directo.
+
+**Pendiente:**
+- Subir el vídeo elegido a YouTube/Vimeo como *unlisted* y enlazarlo en `docs/devpost-draft.md`.
+- Decidir cuál de los dos vídeos (técnico o pitch) va al formulario de Devpost — pueden convivir, pero solo uno es "el" vídeo de la submission.
 
 ## ¿Qué puedes hacer tú ahora mismo?
 
