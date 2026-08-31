@@ -12,9 +12,9 @@
      error view). Add new tokens here, don't hardcode a new color inline. */
   --color-ink: #111b3d;
   --color-muted: #5e6888;
-  --color-purple: #8057f5;
-  --color-blue: #4e78ff;
-  --color-lavender: #f4f1ff;
+  --color-purple: #7c3fc4;
+  --color-pink: #e0217a;
+  --color-lavender: #f6eefc;
   --color-surface: #ffffff;
   --color-surface-sunken: #f7f6fb;
   --color-border: #dfe2ea;

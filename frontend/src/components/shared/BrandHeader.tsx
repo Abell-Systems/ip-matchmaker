@@ -4,6 +4,9 @@ interface BrandHeaderProps {
   domain?: string | null;
 }
 
+// A simplified, icon-scale take on the Abell Systems mark (docs/abell-systems.jpeg):
+// a triangular ring in the brand's violet-to-pink gradient, standing in for the
+// full Penrose-triangle/orbit artwork which doesn't read at header/favicon size.
 export function AbellMark({ size = 34 }: { size?: number }) {
   return (
     <svg
@@ -13,14 +16,16 @@ export function AbellMark({ size = 34 }: { size?: number }) {
       aria-hidden="true"
     >
       <defs>
-        <linearGradient id="abell-gradient" x1="8" y1="8" x2="40" y2="40">
-          <stop offset="0%" stopColor="#8b5cf6" />
-          <stop offset="55%" stopColor="#6d5dfc" />
-          <stop offset="100%" stopColor="#4f7cff" />
+        <linearGradient id="abell-gradient" x1="6" y1="10" x2="42" y2="38">
+          <stop offset="0%" stopColor="#7c3fc4" />
+          <stop offset="55%" stopColor="#b23a9a" />
+          <stop offset="100%" stopColor="#e0217a" />
         </linearGradient>
       </defs>
       <path
-        d="M27.6 4 10.2 25.2c-1.2 1.5-.2 3.8 1.8 3.8h9.2l-3.2 15.1c-.4 2.1 2.2 3.2 3.4 1.5L38 23.9c1.2-1.6.1-3.9-1.9-3.9h-9.2l3.9-12.9C31.5 4.8 29.1 2.6 27.6 4Z"
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M24 5 44 42 4 42Z M24 17 35 34 13 34Z"
         fill="url(#abell-gradient)"
       />
     </svg>

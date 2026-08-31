@@ -7,7 +7,7 @@
   flex-direction: column;
   gap: 24px;
   color: var(--color-text);
-  background: radial-gradient(circle at 85% 15%, rgba(128, 86, 238, 0.13), transparent 35%);
+  background: radial-gradient(circle at 85% 15%, rgba(124, 63, 196, 0.13), transparent 35%);
 }
 
 .header {
@@ -44,7 +44,7 @@
 .card {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(128, 86, 238, 0.16);
+  border: 1px solid rgba(124, 63, 196, 0.16);
   border-radius: 18px;
   padding: 24px 26px;
   background: rgba(255, 255, 255, 0.92);
@@ -58,7 +58,7 @@
   top: 0;
   bottom: 0;
   width: 4px;
-  background: linear-gradient(180deg, var(--color-purple), var(--color-blue));
+  background: linear-gradient(180deg, var(--color-purple), var(--color-pink));
 }
 
 .statusRow {
@@ -75,7 +75,7 @@
   height: 9px;
   border-radius: 50%;
   background: var(--color-purple);
-  box-shadow: 0 0 0 5px rgba(128, 86, 238, 0.1);
+  box-shadow: 0 0 0 5px rgba(124, 63, 196, 0.1);
 }
 
 .message {
@@ -127,8 +127,8 @@
 .primaryBtn {
   border: 0;
   color: white;
-  background: linear-gradient(100deg, var(--color-purple), var(--color-blue));
-  box-shadow: 0 10px 22px rgba(101, 79, 220, 0.18);
+  background: linear-gradient(100deg, var(--color-purple), var(--color-pink));
+  box-shadow: 0 10px 22px rgba(160, 40, 150, 0.2);
 }
 
 .secondaryBtn {

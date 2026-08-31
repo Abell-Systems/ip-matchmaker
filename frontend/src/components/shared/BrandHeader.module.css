@@ -33,10 +33,10 @@
 .domainBadge {
   display: inline-block;
   padding: 8px 13px;
-  border: 1px solid rgba(128, 86, 238, 0.13);
+  border: 1px solid rgba(124, 63, 196, 0.13);
   border-radius: 999px;
   background: var(--color-lavender);
-  color: #7052d8;
+  color: #7c3fc4;
   font-size: 12px;
   font-weight: 650;
 }
