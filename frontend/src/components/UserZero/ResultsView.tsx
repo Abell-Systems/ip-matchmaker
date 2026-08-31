@@ -15,6 +15,17 @@ function getPatentUrl(pubNumber: string): string {
   return `https://patents.google.com/patent/${clean}/en`;
 }
 
+// One human-readable sentence for the executive summary, before any
+// chemistry/patent terminology -- prefers the scorecard's assessment over
+// the raw candidate description since it already reads as a verdict.
+function firstSentence(text: string, maxLen = 180): string {
+  const sentence = text.split(/(?<=[.!?])\s/)[0] || text;
+  if (sentence.length <= maxLen) return sentence;
+  const truncated = sentence.slice(0, maxLen);
+  const lastSpace = truncated.lastIndexOf(" ");
+  return `${truncated.slice(0, lastSpace > 0 ? lastSpace : maxLen)}…`;
+}
+
 export interface ResultsViewProps {
   domain?: string;
   result: JobStatusResponse;
@@ -23,6 +34,7 @@ export interface ResultsViewProps {
 
 export function ResultsView({ domain, result, onReset }: ResultsViewProps) {
   const [showCausalChain, setShowCausalChain] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   const candidates = result.candidates || [];
   const verdicts = result.verdicts || [];
@@ -124,22 +136,52 @@ export function ResultsView({ domain, result, onReset }: ResultsViewProps) {
     currentCluster?.white_space_score !== null &&
     !Number.isNaN(currentCluster.white_space_score);
 
+  const whyItMatters = firstSentence(
+    currentScorecard?.summary || currentCandidate.claimed_novelty || currentCandidate.description
+  );
+
   return (
     <div className={styles.container}>
       <header className={styles.header}>
         <BrandHeader />
         {domain && <div className={styles.domainBadge}>{domain}</div>}
-        <h1 className={styles.title}>
-          {isSurvived
-            ? "Top Surviving Invention Opportunity"
-            : "Analysis Complete — Candidate Invention Rejected"}
-        </h1>
-        <p className={styles.subtitle}>
-          {isSurvived
-            ? "The agent discovered white-space, generated candidate claims, attacked them with adversarial prior-art citations, and verified survival."
-            : "The agent generated candidate claims, performed an adversarial invalidation challenge, and identified blocking prior art that anticipates the invention."}
-        </p>
       </header>
+
+      {/* Executive summary -- conclusion first, technical detail on demand */}
+      <section className={styles.heroCard} aria-label="Result summary">
+        <span className={isSurvived ? styles.survivesBadge : styles.rejectedBadge}>
+          {isSurvived ? "🟢 Survived prior-art review" : "❌ Rejected on prior art"}
+        </span>
+        <h1 className={styles.heroTitle}>{currentCandidate.title}</h1>
+
+        <div className={styles.heroStats}>
+          <div className={styles.heroStat}>
+            <span className={styles.heroStatValue}>
+              {formatScore(currentCluster?.white_space_score)}
+            </span>
+            <span className={styles.heroStatLabel}>Opportunity score</span>
+          </div>
+          <div className={styles.heroStat}>
+            <span className={styles.heroStatValue}>
+              {formatScore(currentScorecard?.evidence)}
+            </span>
+            <span className={styles.heroStatLabel}>Confidence</span>
+          </div>
+        </div>
+
+        <div className={styles.whyItMatters}>
+          <span className={styles.whyItMattersLabel}>Why it matters</span>
+          <p className={styles.whyItMattersText}>{whyItMatters}</p>
+        </div>
+
+        <button
+          type="button"
+          className={styles.viewEvidenceBtn}
+          onClick={() => setShowDetails(true)}
+        >
+          View evidence
+        </button>
+      </section>
 
       {displayCandidates.length > 1 && (
         <div className={styles.candidateSelector}>
@@ -165,7 +207,19 @@ export function ResultsView({ domain, result, onReset }: ResultsViewProps) {
         </div>
       )}
 
-      {/* Decision Card */}
+      {/* Technical detail -- collapsed by default; the hero card above is the product */}
+      <div className={styles.drilldownSection}>
+        <button
+          type="button"
+          className={`${styles.drilldownToggleBtn} ${showDetails ? styles.drilldownActive : ""}`}
+          onClick={() => setShowDetails((prev) => !prev)}
+          aria-expanded={showDetails}
+        >
+          <span className={styles.toggleIcon}>{showDetails ? "▲" : "▸"}</span>
+          <span>{showDetails ? "Hide details" : "Details"}</span>
+        </button>
+
+        {showDetails && (
       <section className={styles.decisionCard} aria-label="Decision card summary">
         {/* 1. What is proposed? */}
         <div className={styles.sectionBlock}>
@@ -384,6 +438,8 @@ export function ResultsView({ domain, result, onReset }: ResultsViewProps) {
           </div>
         </div>
       </section>
+        )}
+      </div>
 
       {/* Drill-down button & Causal Chain */}
       <div className={styles.drilldownSection}>
@@ -395,11 +451,11 @@ export function ResultsView({ domain, result, onReset }: ResultsViewProps) {
           onClick={() => setShowCausalChain((prev) => !prev)}
           aria-expanded={showCausalChain}
         >
-          <span className={styles.toggleIcon}>{showCausalChain ? "▲" : "▼"}</span>
+          <span className={styles.toggleIcon}>{showCausalChain ? "▲" : "▸"}</span>
           <span>
             {showCausalChain
-              ? "Hide Causal Chain drill-down"
-              : "Why this candidate? (View Causal Chain)"}
+              ? "Hide"
+              : "How the agent reached this result"}
           </span>
         </button>
 

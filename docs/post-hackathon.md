@@ -39,9 +39,20 @@ better once it's real."
 
 ## Important — not blocking, but where the value is
 
-- **Export.** A PDF/DOCX brief per candidate (claim summary + the cited
-  prior art trail) that a patent attorney can act on without touching the
-  UI. Probably the single highest-value feature for anyone paying for this.
+- **Export.** A PDF/DOCX brief per candidate (executive summary, opportunity
+  and technical layers, prior art, agent review, evidence, technical
+  appendix) that a patent attorney can act on without touching the UI.
+  Probably the single highest-value feature for anyone paying for this. The
+  2026-08-31 `ResultsView` rework (executive summary first, technical detail
+  collapsed behind "Details") is the on-screen version of this same
+  structure — the PDF should mirror it, not invent a new layout.
+- **"Continue analysis" as a real action, not just a reset.** Today
+  `ResultsView`'s only next step is "Analyze another opportunity" (start
+  over). A product should let the user continue *this* opportunity:
+  explore more prior art, ask the agent to refine the candidate, compare it
+  against alternative candidates in the same cluster, or generate the
+  technical brief above. None of these exist as backend capabilities yet —
+  don't add the buttons until the capability behind them is real.
 - **Workflow states.** Candidate → under review → filed/abandoned. Turns
   this from a one-shot report into something a team tracks over time.
 - **Audit trail.** Immutable log of what was searched, when, and what
