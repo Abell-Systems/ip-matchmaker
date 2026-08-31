@@ -35,8 +35,12 @@ Esto refleja exactamente cómo trabaja un examinador de patentes profesional: un
 - La interfaz web muestra el mapa de oportunidades: grupos de patentes con sus espacios en blanco, y al hacer clic en un grupo, las invenciones propuestas con sus puntuaciones y citas.
 
 **Pendiente:**
-- Desplegar el backend en Google Cloud Run (bloqueado solo por necesitar una cuenta GCP del equipo, no por trabajo técnico).
-- Grabar el vídeo de demostración (~4 minutos).
+- Subir el vídeo de demostración a YouTube/Vimeo como *unlisted* y enlazarlo en `docs/devpost-draft.md`.
+
+**Listo (31 de agosto):**
+- Desplegado en Google Cloud Run con datos reales de BigQuery.
+- Vídeo de demostración grabado, silencioso y con subtítulos en pantalla: `docs/demo/patent-innovation-agent-demo.mp4` (2:07, muy por debajo del límite de 4 minutos).
+- Guion de narración listo para grabar la voz en off: `docs/demo/narration_script.md`. Si te animas a poner la voz, esa es la estructura: Problema → qué hace Abell Systems → evidencia real de patentes → agente inventor → desafío adversarial → oportunidad superviviente → por qué importa. No hace falta narrar la interfaz, la pantalla ya aporta la prueba.
 
 ## ¿Qué puedes hacer tú ahora mismo?
 
