@@ -68,3 +68,4 @@ better once it's real."
 - The per-IP in-memory rate limiter and the `--max-instances=1` pin are
   demo-window safety nets, not the intended long-term shape — see the
   Blocking section above for what replaces each of them.
+
