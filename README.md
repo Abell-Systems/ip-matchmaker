@@ -4,6 +4,8 @@ _Finds patentable white-space opportunities by mining patent landscapes, proposi
 
 Built for the **Devpost "All Things Agentic Hackathon"** (Google Cloud / Gemini) — track: **The Taskmaster**.
 
+> The public demo endpoint is intentionally unauthenticated for evaluator access, and protected instead by execution/concurrency and cost controls: a single-in-flight-analysis lock, a per-IP rate limit on `POST /api/analyze` (3/hour), a BigQuery `maximum_bytes_billed` cap, and a Cloud Billing budget alert.
+
 > Status: Live deployed on Google Cloud Run at [`https://patent-agent-sedvtsa23q-uc.a.run.app`](https://patent-agent-sedvtsa23q-uc.a.run.app). Full agent graph (research → inventor/adversarial loop → governor) live-validated, returning fully populated candidates/verdicts/scorecards end to end. Real BigQuery data (not mock) served from a materialized domain index — see `docs/deploy.md` §2b. Async `/api/analyze` job endpoint wired into the frontend's execution/results flow, with a history view to reopen past analyses. CI (pytest + tsc/vite/oxlint) passing on every push/PR. See [`docs/roadmap.md`](docs/roadmap.md) and [`docs/architecture.md`](docs/architecture.md).
 
 ## Architecture

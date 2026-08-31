@@ -197,6 +197,30 @@ def test_analyze_rejects_concurrent_runs(monkeypatch):
     gate.set()
 
 
+def test_analyze_rate_limits_per_ip(monkeypatch):
+    import asyncio
+
+    import main
+
+    async def fake_execute(job_id, req):
+        await asyncio.sleep(0)
+        return {"candidates": [], "verdicts": [], "scorecards": []}
+
+    monkeypatch.setattr(main, "_execute_analysis", fake_execute)
+    for _ in range(main._ANALYZE_RATE_LIMIT):
+        resp = client.post("/api/analyze", json={"query": "q", "domain": "d"})
+        assert resp.status_code == 202
+        for _ in range(100):
+            if client.get(f"/api/analyze/{resp.json()['job_id']}").json()["status"] != "running":
+                break
+            import time
+
+            time.sleep(0.05)
+
+    over_limit = client.post("/api/analyze", json={"query": "q", "domain": "d"})
+    assert over_limit.status_code == 429
+
+
 def test_frontend_root_and_static_assets_serve_200():
     res_root = client.get("/")
     assert res_root.status_code == 200

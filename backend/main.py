@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import re
+import time
 import uuid
 from datetime import datetime, timezone
 
@@ -16,7 +17,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import HTTPException, Query  # noqa: E402
+from fastapi import HTTPException, Query, Request  # noqa: E402
 from fastapi.responses import FileResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from google.adk.cli.fast_api import get_fast_api_app  # noqa: E402
@@ -565,9 +566,29 @@ async def _run_job(job_id: str, req: AnalyzeRequest) -> None:
             await _job_store.update_job(job_id, err_info)
 
 
+_ANALYZE_RATE_LIMIT = 3
+_ANALYZE_RATE_WINDOW_S = 3600.0
+# ponytail: per-process in-memory counter, no new infra -- valid because Cloud
+# Run is pinned to --max-instances=1 (same reasoning as the in-memory job store).
+_analyze_request_times: dict[str, list[float]] = {}
+
+
+def _check_rate_limit(client_ip: str) -> None:
+    now = time.monotonic()
+    recent = [t for t in _analyze_request_times.get(client_ip, []) if now - t < _ANALYZE_RATE_WINDOW_S]
+    if len(recent) >= _ANALYZE_RATE_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded: max {_ANALYZE_RATE_LIMIT} analyses per hour per IP.",
+        )
+    recent.append(now)
+    _analyze_request_times[client_ip] = recent
+
+
 @app.post("/api/analyze", status_code=202)
-async def analyze(req: AnalyzeRequest) -> dict:
+async def analyze(req: AnalyzeRequest, request: Request) -> dict:
     """Kicks off the unified research service + agent graph in the background and returns a job id immediately."""
+    _check_rate_limit(request.client.host if request.client else "unknown")
     if _execution_policy.is_busy():
         raise HTTPException(status_code=503, detail="An analyze run is already in progress.")
     job_id = uuid.uuid4().hex
